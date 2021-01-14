@@ -7,8 +7,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 )
@@ -62,6 +60,8 @@ func handleWriteRequest(CConn net.Conn, fd int) {
 
 }
 
+const SO_ORIGINAL_DST = 80
+
 func main() {
 
 	l, err := net.Listen("tcp", ":8080")
@@ -79,39 +79,38 @@ func main() {
 			return
 		}
 
-		ipSli := strings.Split(CConn.RemoteAddr().String(), ":")
-		if len(ipSli) < 0 {
-			log.Fatal("split remote addr failed, \n", CConn.RemoteAddr().String())
+		tcpSock := CConn.(*net.TCPConn)
+		if tcpSock == nil {
+			log.Fatal("convert to tcp sock failed")
 		}
-		log.Println("split remote addr success, remote addr: ", CConn.RemoteAddr().String(), " local addr: ", CConn.LocalAddr().String())
 
-		ip := net.ParseIP(ipSli[0])
-		if ip == nil {
-			log.Fatal("parse ip failed, addr is \n", CConn.RemoteAddr().String())
+		handler, err := tcpSock.File()
+		if err != nil {
+			log.Fatal("get tcp fd failed")
+		}
+
+		addr, err := unix.GetsockoptIPv6Mreq(int(handler.Fd()), syscall.IPPROTO_IP, SO_ORIGINAL_DST)
+		if err != nil {
+			log.Fatal(err)
 		}
 
 		var sock int
 		var sockAddr unix.Sockaddr
 		// ip is ipv4
-		if ip.To4() != nil {
-			sock, err = unix.Socket(unix.AF_INET, unix.SOCK_STREAM, unix.IPPROTO_TCP)
-			sockIpv4 := new(unix.SockaddrInet4)
-			for i := 0; i < len(sockIpv4.Addr); i++ {
-				sockIpv4.Addr[i] = ip[i]
-			}
-			sockIpv4.Port, err = strconv.Atoi(ipSli[1])
-			if err != nil {
-				log.Fatal("convert port failed, remote addr is: ", CConn.RemoteAddr().String(), " err: \n", err)
-			}
-			sockAddr = sockIpv4
-		} else {
-			// ip is ipv6
-			sock, err = unix.Socket(unix.AF_INET6, unix.SOCK_STREAM, unix.IPPROTO_TCP)
-			log.Println(">>>>>> ignore ipv6")
+		sock, err = unix.Socket(unix.AF_INET, unix.SOCK_STREAM, unix.IPPROTO_TCP)
+		sockIpv4 := new(unix.SockaddrInet4)
+		for i := 0; i < len(sockIpv4.Addr); i++ {
+			sockIpv4.Addr[i] = addr.Multiaddr[4+i]
 		}
-		if err != nil {
-			log.Fatal("create sock err: ", err)
-		}
+		sockIpv4.Port = int(addr.Multiaddr[2])<<8 + int(addr.Multiaddr[3])
+		sockAddr = sockIpv4
+
+		log.Println("remote addr is ", sockIpv4.Addr, " port is ", sockIpv4.Port)
+		//else {
+		//	// ip is ipv6
+		//	sock, err = unix.Socket(unix.AF_INET6, unix.SOCK_STREAM, unix.IPPROTO_TCP)
+		//	log.Println(">>>>>> ignore ipv6")
+		//}
 
 		err = unix.Connect(sock, sockAddr)
 		if err != nil {
