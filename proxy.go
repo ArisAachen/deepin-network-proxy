@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"golang.org/x/sys/unix"
 	"io"
 	"log"
@@ -11,14 +12,11 @@ import (
 	"time"
 )
 
-var Head string = `
-CONNECT 10.20.31.56:808 HTTP/1.1
-Host: 10.20.31.56:808
+var headTpl string = `CONNECT %s HTTP/1.1
+Host: %s
 `
 
-func handleReadRequest(CConn net.Conn, fd int) {
-	log.Println("remote addr is ", CConn.RemoteAddr())
-	defer CConn.Close()
+func handleReadRequest(CConn net.Conn, LConn net.Conn, addr string) {
 	for {
 		buf := make([]byte, 512)
 		_, err := CConn.Read(buf)
@@ -26,11 +24,13 @@ func handleReadRequest(CConn net.Conn, fd int) {
 			log.Println("CConn read error ", err)
 			return
 		}
-		log.Println("CConn read success ")
-		log.Println(string(buf))
-		log.Println("------------------Read end line------------------")
 
-		_, err = unix.Write(fd, buf)
+		//if addr == "10.20.31.98:12345" {
+		//	log.Println("CConn read success ")
+		//	log.Println(string(buf))
+		//}
+
+		_, err = LConn.Write(buf)
 		if err != nil {
 			log.Println("LConn read error ", err)
 			return
@@ -38,18 +38,19 @@ func handleReadRequest(CConn net.Conn, fd int) {
 	}
 }
 
-func handleWriteRequest(CConn net.Conn, fd int) {
-	defer CConn.Close()
+func handleWriteRequest(CConn net.Conn, LConn net.Conn, addr string) {
 	for {
 		buf := make([]byte, 512)
-		_, err := unix.Read(fd, buf)
+		_, err := LConn.Read(buf)
 		if err != nil {
 			log.Println("LConn read error ", err)
 			return
 		}
-		log.Println("LConn read success ")
-		log.Println(string(buf))
-		log.Println("------------------Write end line------------------")
+
+		if addr == "10.20.31.98:12345" {
+			log.Println("CConn read success ")
+			log.Println(string(buf))
+		}
 
 		_, err = CConn.Write(buf)
 		if err != nil {
@@ -72,7 +73,6 @@ func main() {
 	defer l.Close()
 
 	for {
-		log.Println("begin listening... ...")
 		CConn, err := l.Accept()
 		if err != nil {
 			log.Println("accept is ", err)
@@ -94,42 +94,23 @@ func main() {
 			log.Fatal(err)
 		}
 
-		var sock int
-		var sockAddr unix.Sockaddr
-		// ip is ipv4
-		sock, err = unix.Socket(unix.AF_INET, unix.SOCK_STREAM, unix.IPPROTO_TCP)
-		sockIpv4 := new(unix.SockaddrInet4)
-		for i := 0; i < len(sockIpv4.Addr); i++ {
-			sockIpv4.Addr[i] = addr.Multiaddr[4+i]
-		}
-		sockIpv4.Port = int(addr.Multiaddr[2])<<8 + int(addr.Multiaddr[3])
-		sockAddr = sockIpv4
-
-		log.Println("remote addr is ", sockIpv4.Addr, " port is ", sockIpv4.Port)
-		//else {
-		//	// ip is ipv6
-		//	sock, err = unix.Socket(unix.AF_INET6, unix.SOCK_STREAM, unix.IPPROTO_TCP)
-		//	log.Println(">>>>>> ignore ipv6")
-		//}
-
-		err = unix.Connect(sock, sockAddr)
+		LConn, err := net.Dial("tcp", "10.20.31.75:808")
 		if err != nil {
-			log.Println("connect sock err: \n", err)
-			continue
+			log.Fatal(err)
 		}
 
-		_, err = unix.Write(sock, []byte(Head))
+		targetIp := net.IP(addr.Multiaddr[4:8])
+		targetPort := int(addr.Multiaddr[2])<<8 + int(addr.Multiaddr[3])
+		targetAddr := fmt.Sprintf("%s:%v", targetIp.String(), targetPort)
+		head := fmt.Sprintf(headTpl, targetAddr, targetAddr)
+
+		_, err = LConn.Write([]byte(head))
 		if err != nil {
-			log.Fatal("write head err: \n", err)
+			log.Fatal("write head failed, err ", err)
 		}
 
-		if err != nil {
-			log.Println("head write err is ", err)
-			return
-		}
-
-		go handleReadRequest(CConn, sock)
-		go handleWriteRequest(CConn, sock)
+		go handleReadRequest(CConn, LConn, targetAddr)
+		go handleWriteRequest(CConn, LConn, targetAddr)
 	}
 
 	//test := []byte{
