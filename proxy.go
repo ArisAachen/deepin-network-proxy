@@ -1,11 +1,11 @@
 package main
 
 import (
-	"fmt"
-	"golang.org/x/sys/unix"
+	"bufio"
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"syscall"
@@ -79,38 +79,63 @@ func main() {
 			return
 		}
 
-		tcpSock := CConn.(*net.TCPConn)
-		if tcpSock == nil {
-			log.Fatal("convert to tcp sock failed")
-		}
+		go func(con net.Conn) {
+			defer con.Close()
+			for {
+				br := bufio.NewReader(con)
+				buf := make([]byte,512)
+				_,err := br.Read(buf)
+				if err != nil {
+					log.Fatal(err)
+				}
 
-		handler, err := tcpSock.File()
-		if err != nil {
-			log.Fatal("get tcp fd failed")
-		}
+				log.Println("read success, msg",string(buf))
 
-		addr, err := unix.GetsockoptIPv6Mreq(int(handler.Fd()), syscall.IPPROTO_IP, SO_ORIGINAL_DST)
-		if err != nil {
-			log.Fatal(err)
-		}
 
-		LConn, err := net.Dial("tcp", "10.20.31.75:808")
-		if err != nil {
-			log.Fatal(err)
-		}
+				req, err := http.ReadRequest(br)
+				if err != nil {
+					log.Println("read error ", err)
+					return
+				}
+				log.Println("read success... ...")
+				log.Println(req)
+				log.Println("----------------------")
+			}
 
-		targetIp := net.IP(addr.Multiaddr[4:8])
-		targetPort := int(addr.Multiaddr[2])<<8 + int(addr.Multiaddr[3])
-		targetAddr := fmt.Sprintf("%s:%v", targetIp.String(), targetPort)
-		head := fmt.Sprintf(headTpl, targetAddr, targetAddr)
+		}(CConn)
 
-		_, err = LConn.Write([]byte(head))
-		if err != nil {
-			log.Fatal("write head failed, err ", err)
-		}
-
-		go handleReadRequest(CConn, LConn, targetAddr)
-		go handleWriteRequest(CConn, LConn, targetAddr)
+		//tcpSock := CConn.(*net.TCPConn)
+		//if tcpSock == nil {
+		//	log.Fatal("convert to tcp sock failed")
+		//}
+		//
+		//handler, err := tcpSock.File()
+		//if err != nil {
+		//	log.Fatal("get tcp fd failed")
+		//}
+		//
+		//addr, err := unix.GetsockoptIPv6Mreq(int(handler.Fd()), syscall.IPPROTO_IP, SO_ORIGINAL_DST)
+		//if err != nil {
+		//	log.Fatal(err)
+		//}
+		//
+		//LConn, err := net.Dial("tcp", "10.20.31.75:808")
+		//if err != nil {
+		//	log.Fatal(err)
+		//}
+		//
+		//targetIp := net.IP(addr.Multiaddr[4:8])
+		//targetPort := int(addr.Multiaddr[2])<<8 + int(addr.Multiaddr[3])
+		//targetAddr := fmt.Sprintf("%s:%v", targetIp.String(), targetPort)
+		//head := fmt.Sprintf(headTpl, targetAddr, targetAddr)
+		//
+		//_, err = LConn.Write([]byte(head))
+		//if err != nil {
+		//	log.Fatal("write head failed, err ", err)
+		//}
+		//
+		//go handleReadRequest(CConn, LConn, targetAddr)
+		//go handleWriteRequest(CConn, LConn, targetAddr)
 	}
 
 	//test := []byte{
