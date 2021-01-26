@@ -1,22 +1,20 @@
 package main
 
 import (
-	"bufio"
 	"io"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
+
+	cfg "github.com/proxyTest/Config"
+	pro "github.com/proxyTest/HttpProxy"
 )
 
-var headTpl string = `CONNECT %s HTTP/1.1
-Host: %s
-`
-
-func handleReadRequest(CConn net.Conn, LConn net.Conn, addr string) {
+func handleReadRequest(CConn net.Conn, LConn net.Conn) {
 	for {
 		buf := make([]byte, 512)
 		_, err := CConn.Read(buf)
@@ -24,11 +22,6 @@ func handleReadRequest(CConn net.Conn, LConn net.Conn, addr string) {
 			log.Println("CConn read error ", err)
 			return
 		}
-
-		//if addr == "10.20.31.98:12345" {
-		//	log.Println("CConn read success ")
-		//	log.Println(string(buf))
-		//}
 
 		_, err = LConn.Write(buf)
 		if err != nil {
@@ -38,7 +31,7 @@ func handleReadRequest(CConn net.Conn, LConn net.Conn, addr string) {
 	}
 }
 
-func handleWriteRequest(CConn net.Conn, LConn net.Conn, addr string) {
+func handleWriteRequest(CConn net.Conn, LConn net.Conn) {
 	for {
 		buf := make([]byte, 512)
 		_, err := LConn.Read(buf)
@@ -47,9 +40,8 @@ func handleWriteRequest(CConn net.Conn, LConn net.Conn, addr string) {
 			return
 		}
 
-		if addr == "10.20.31.98:12345" {
-			log.Println("CConn read success ")
-			log.Println(string(buf))
+		if strings.Index(string(buf), "Proxy-agent") != 0 {
+			return
 		}
 
 		_, err = CConn.Write(buf)
@@ -72,6 +64,20 @@ func main() {
 	}
 	defer l.Close()
 
+	//text := "aris:12345678"
+	//encodedText := base64.StdEncoding.EncodeToString([]byte(text))
+
+	config := cfg.NewProxyCfg()
+	err = config.LoadPxyCfg("/home/aris/Desktop/Proxy.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	proxy, err := config.GetProxy("global", "http")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	for {
 		CConn, err := l.Accept()
 		if err != nil {
@@ -79,31 +85,11 @@ func main() {
 			return
 		}
 
-		go func(con net.Conn) {
-			defer con.Close()
-			for {
-				br := bufio.NewReader(con)
-				buf := make([]byte,512)
-				_,err := br.Read(buf)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				log.Println("read success, msg",string(buf))
-
-
-				req, err := http.ReadRequest(br)
-				if err != nil {
-					log.Println("read error ", err)
-					return
-				}
-				log.Println("read success... ...")
-				log.Println(req)
-				log.Println("----------------------")
-			}
-
-		}(CConn)
-
+		handler := pro.NewTcpHandler(CConn, proxy)
+		if handler == nil {
+			continue
+		}
+		handler.Communicate()
 		//tcpSock := CConn.(*net.TCPConn)
 		//if tcpSock == nil {
 		//	log.Fatal("convert to tcp sock failed")
@@ -119,7 +105,7 @@ func main() {
 		//	log.Fatal(err)
 		//}
 		//
-		//LConn, err := net.Dial("tcp", "10.20.31.75:808")
+		//LConn, err := net.Dial("tcp", "172.16.82.129:808")
 		//if err != nil {
 		//	log.Fatal(err)
 		//}
@@ -127,15 +113,35 @@ func main() {
 		//targetIp := net.IP(addr.Multiaddr[4:8])
 		//targetPort := int(addr.Multiaddr[2])<<8 + int(addr.Multiaddr[3])
 		//targetAddr := fmt.Sprintf("%s:%v", targetIp.String(), targetPort)
-		//head := fmt.Sprintf(headTpl, targetAddr, targetAddr)
 		//
-		//_, err = LConn.Write([]byte(head))
+		//req := &http.Request{
+		//	Method: http.MethodConnect,
+		//	Host:   targetAddr,
+		//	URL: &url.URL{
+		//		Host: targetAddr,
+		//	},
+		//	Header: http.Header{
+		//		"Proxy-Connection":    []string{"Keep-Alive"},
+		//		"Proxy-Authorization": []string{"Basic " + arr},
+		//	},
+		//}
+		//
+		//err = req.Write(LConn)
 		//if err != nil {
 		//	log.Fatal("write head failed, err ", err)
 		//}
 		//
-		//go handleReadRequest(CConn, LConn, targetAddr)
-		//go handleWriteRequest(CConn, LConn, targetAddr)
+		//buf := make([]byte, 512)
+		//_, err = LConn.Read(buf)
+		//if err != nil {
+		//	log.Fatal(err)
+		//}
+		//log.Println(string(buf))
+		//
+		//go io.Copy(LConn, CConn)
+		//go io.Copy(CConn, LConn)
+		//go handleReadRequest(CConn, LConn)
+		//go handleWriteRequest(CConn, LConn)
 	}
 
 	//test := []byte{
