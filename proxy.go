@@ -8,7 +8,6 @@ import (
 )
 
 func main() {
-
 	l, err := net.Listen("tcp", ":8080")
 	if err != nil {
 		log.Println(err)
@@ -34,7 +33,7 @@ func main() {
 			return
 		}
 
-		handler := pro.NewTcpHandler(CConn, proxy)
+		handler := pro.NewSock5Handler(CConn, proxy)
 		if handler == nil {
 			continue
 		}

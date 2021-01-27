@@ -1,43 +1,30 @@
 package HttpProxy
 
 import (
-	"bufio"
-	"encoding/base64"
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
-	"net/http"
-	"net/url"
+	"pkg.deepin.io/lib/log"
 	"strconv"
 	"time"
 
 	"github.com/proxyTest/Com"
 	"github.com/proxyTest/Config"
-	"pkg.deepin.io/lib/log"
 )
 
-// tcp handler create handle bind local conn and remote conn
-type TcpHandler struct {
+type Sock4Handler struct {
 	localHandler  net.Conn
 	remoteHandler net.Conn
 }
 
-// auth message
-type auth struct {
-	user     string
-	password string
-}
-
-var logger = log.NewLogger("daemon/session/proxy")
-
-func NewTcpHandler(local net.Conn, proxy Config.Proxy) *TcpHandler {
+func NewSock4Handler(local net.Conn, proxy Config.Proxy) *Sock4Handler {
 	logger.SetLogLevel(log.LevelDebug)
-	// create handler
-	handler := &TcpHandler{
+	handler := &Sock4Handler{
 		localHandler: local,
 	}
-	// try to invoke proxy
 	err := handler.invokeProxy(local, proxy)
 	if err != nil {
 		return nil
@@ -46,7 +33,7 @@ func NewTcpHandler(local net.Conn, proxy Config.Proxy) *TcpHandler {
 }
 
 // try to invoke proxy
-func (handler *TcpHandler) invokeProxy(local net.Conn, proxy Config.Proxy) error {
+func (handler *Sock4Handler) invokeProxy(local net.Conn, proxy Config.Proxy) error {
 	// get remote addr
 	tcpCon, ok := local.(*net.TCPConn)
 	if !ok {
@@ -81,50 +68,70 @@ func (handler *TcpHandler) invokeProxy(local net.Conn, proxy Config.Proxy) error
 	return nil
 }
 
-// create tunnel between proxy and server
-func (handler *TcpHandler) tunnel(rConn net.Conn, auth auth, addr *net.TCPAddr) error {
-	// create http head
-	req := &http.Request{
-		Method: http.MethodConnect,
-		Host:   addr.String(),
-		URL: &url.URL{
-			Host: addr.String(),
-		},
-		Header: http.Header{
-			//"Proxy-Connection": []string{"Keep-Alive"},
-		},
+func (handler *Sock4Handler) tunnel(rConn net.Conn, auth auth, addr *net.TCPAddr) error {
+	/*
+					sock4 connect request
+				+----+----+----+----+----+----+----+----+----+----+....+----+
+				| VN | CD | DSTPORT |      DSTIP        | USERID       |NULL|
+				+----+----+----+----+----+----+----+----+----+----+....+----+
+		           1    1      2              4           variable       1
+	*/
+	buf := make([]byte, 2)
+	buf[0] = 4 // sock version
+	buf[1] = 1 // connect command
+	// convert port 2 byte
+	writer := new(bytes.Buffer)
+	port := uint16(addr.Port)
+	if port == 0 {
+		port = 80
 	}
-	// check if need auth
-	if auth.user != "" && auth.password != "" {
-		authMsg := auth.user + ":" + auth.password
-		req.Header.Add("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(authMsg)))
-	}
-	// send connect request to remote to create tunnel
-	err := req.Write(rConn)
+	err := binary.Write(writer, binary.LittleEndian, port)
 	if err != nil {
+		logger.Warningf("sock4 convert port failed, err: %v", err)
 		return err
 	}
-	// read response
-	reader := bufio.NewReader(rConn)
-	resp, err := http.ReadResponse(reader, req)
+	portBy := writer.Bytes()[0:2]
+	buf = append(buf, portBy...)
+	// add ip and user
+	buf = append(buf, addr.IP...)
+	if auth.user != "" {
+		buf = append(buf, []byte(auth.user)...)
+	} else {
+		buf = append(buf, uint8(0))
+	}
+	// request proxy connect remote server
+	logger.Debugf("sock4 send connect request, buf: %v", buf)
+	_, err = rConn.Write(buf)
 	if err != nil {
+		logger.Warningf("sock4 send connect request failed, err: %v", err)
 		return err
 	}
-	logger.Debug(resp.Status)
-	// close body
-	defer resp.Body.Close()
-	// check if connect success
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("proxy response error, status code: %v, message: %s",
-			resp.StatusCode, resp.Status)
+	buf = make([]byte, 32)
+	_, err = rConn.Read(buf)
+	if err != nil {
+		logger.Warningf("sock4 connect response failed, err: %v", err)
+		return err
 	}
-	logger.Debugf("http proxy: tunnel create success, [%s] -> [%s] -> [%s]",
+	/*
+					sock4 server response
+				+----+----+----+----+----+----+----+----+
+				| VN | CD | DSTPORT |      DSTIP        |
+				+----+----+----+----+----+----+----+----+
+		          1    1      2              4
+
+	*/
+	// 0   0x5A
+	if buf[0] != 0 || buf[1] != 90 {
+		logger.Warningf("sock4 proto is invalid, sock type: %v, code: %v", buf[0], buf[1])
+		return fmt.Errorf("sock4 proto is invalid, sock type: %v, code: %v", buf[0], buf[1])
+	}
+	logger.Debugf("sock4 proxy: tunnel create success, [%s] -> [%s] -> [%s]",
 		handler.localHandler.RemoteAddr(), rConn.RemoteAddr(), addr.String())
 	return nil
 }
 
 // communicate
-func (handler *TcpHandler) Communicate() {
+func (handler *Sock4Handler) Communicate() {
 	// local to remote
 	go func() {
 		logger.Debug("copy local -> remote")
