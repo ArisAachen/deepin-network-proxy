@@ -1,81 +1,37 @@
-package HttpProxy
+package TcpProxy
 
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
-	"io"
 	"net"
-	"pkg.deepin.io/lib/log"
-	"strconv"
-	"time"
 
-	"github.com/proxyTest/Com"
-	"github.com/proxyTest/Config"
+	"github.com/DeepinProxy/Config"
+	"pkg.deepin.io/lib/log"
 )
 
 type Sock5Handler struct {
 	localHandler  net.Conn
 	remoteHandler net.Conn
+	proxy         Config.Proxy
 }
 
 func NewSock5Handler(local net.Conn, proxy Config.Proxy) *Sock5Handler {
 	logger.SetLogLevel(log.LevelDebug)
 	handler := &Sock5Handler{
 		localHandler: local,
-	}
-	err := handler.invokeProxy(local, proxy)
-	if err != nil {
-		return nil
+		proxy:        proxy,
 	}
 	return handler
 }
 
-type Sock5Proto struct {
-	Version uint8
-	NMethod uint8
-	Methods []uint8
-}
-
-// try to invoke proxy
-func (handler *Sock5Handler) invokeProxy(local net.Conn, proxy Config.Proxy) error {
-	// get remote addr
-	tcpCon, ok := local.(*net.TCPConn)
-	if !ok {
-		logger.Warningf("local conn is not tcp conn")
-		return errors.New("local conn is not tcp conn")
-	}
-	tcpAddr, err := Com.GetTcpRemoteAddr(tcpCon)
-	if err != nil {
-		logger.Warningf("get tcp remote addr failed, err: %v", err)
-		return nil
-	}
-	logger.Debugf("remote addr is %v", tcpAddr.String())
-	// dial remote server
-	port := strconv.Itoa(proxy.Port)
-	if port == "" {
-		port = "80"
-	}
-	proxyAddr := proxy.Server + ":" + strconv.Itoa(proxy.Port)
-	rConn, err := net.DialTimeout("tcp", proxyAddr, 3*time.Second)
-	if err != nil {
-		logger.Warningf("connect to remote failed, err: %v", err)
-		return err
-	}
-	// create tunnel
-	err = handler.tunnel(rConn, auth{user: proxy.UserName, password: proxy.Password}, tcpAddr)
-	if err != nil {
-		logger.Warningf("create tunnel failed, err: %v", err)
-		return err
-	}
-	// add remote handler
-	handler.remoteHandler = rConn
-	return nil
-}
-
 // create tunnel between proxy and server
-func (handler *Sock5Handler) tunnel(rConn net.Conn, auth auth, addr *net.TCPAddr) error {
+func (handler *Sock5Handler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
+	// auth message
+	auth := auth{
+		user:     handler.proxy.UserName,
+		password: handler.proxy.Password,
+	}
 	/*
 	    sock5 client hand shake request
 	  +----+----------+----------+
@@ -197,7 +153,7 @@ func (handler *Sock5Handler) tunnel(rConn net.Conn, auth auth, addr *net.TCPAddr
 		return err
 	}
 	logger.Debugf("sock5 request successfully")
-	buf = make([]byte, 32)
+	buf = make([]byte, 16)
 	_, err = rConn.Read(buf)
 	if err != nil {
 		logger.Warningf("sock5 connect response failed, err: %v", err)
@@ -210,30 +166,7 @@ func (handler *Sock5Handler) tunnel(rConn net.Conn, auth auth, addr *net.TCPAddr
 	}
 	logger.Debugf("sock5 proxy: tunnel create success, [%s] -> [%s] -> [%s]",
 		handler.localHandler.RemoteAddr(), rConn.RemoteAddr(), addr.String())
+	// save remote handler
+	handler.remoteHandler = rConn
 	return nil
-}
-
-func (handler *Sock5Handler) Communicate() {
-	// local to remote
-	go func() {
-		logger.Debug("copy local -> remote")
-		_, err := io.Copy(handler.localHandler, handler.remoteHandler)
-		if err != nil {
-			logger.Debugf("local to remote closed")
-			// ignore close failed
-			err = handler.localHandler.Close()
-			err = handler.remoteHandler.Close()
-		}
-	}()
-	// remote to local
-	go func() {
-		logger.Debugf("copy remote -> local")
-		_, err := io.Copy(handler.remoteHandler, handler.localHandler)
-		if err != nil {
-			logger.Debugf("remote to local closed")
-			// ignore close failed
-			err = handler.localHandler.Close()
-			err = handler.remoteHandler.Close()
-		}
-	}()
 }

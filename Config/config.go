@@ -3,10 +3,11 @@ package Config
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/yaml.v2"
 )
 
 // proxy type, support HTTP SOCK4 SOCK5
