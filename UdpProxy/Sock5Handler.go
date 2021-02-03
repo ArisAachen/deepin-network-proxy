@@ -1,7 +1,6 @@
 package UdpProxy
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -15,17 +14,21 @@ type Sock5Handler struct {
 	localHandler  net.Addr
 	RemoteHandler net.Conn
 	proxy         Config.Proxy
-	data          []sync.Pool
+	data          sync.Pool
 }
 
-var logger = log.NewLogger("daemon/proxy")
+var logger *log.Logger
 
 func NewSock5Handler(local net.Addr, proxy Config.Proxy) *Sock5Handler {
-	logger.SetLogLevel(log.LevelDebug)
 	handler := &Sock5Handler{
 		localHandler: local,
 		proxy:        proxy,
-		data:         make([]sync.Pool, 17),
+		data: sync.Pool{
+			New: func() interface{} {
+				b := make([]byte, 512)
+				return &b
+			},
+		},
 	}
 	return handler
 }
@@ -135,7 +138,7 @@ func (handler *Sock5Handler) Tunnel(rConn net.Conn, addr *net.UDPAddr) error {
 	// add addr
 	if addr.IP.To4() != nil {
 		buf[3] = 1
-		buf = append(buf, net.IP{}...)
+		buf = append(buf, net.IP{127, 0, 0, 0}...)
 	} else if addr.IP.To16() != nil {
 		buf[3] = 4
 		buf = append(buf, addr.IP.To16()...)
@@ -144,18 +147,13 @@ func (handler *Sock5Handler) Tunnel(rConn net.Conn, addr *net.UDPAddr) error {
 		buf = append(buf, addr.IP...)
 	}
 	// convert port 2 byte
-	writer := new(bytes.Buffer)
-	port := uint16(addr.Port)
-	if port == 0 {
-		port = 80
+	portU := uint16(addr.Port)
+	if portU == 0 {
+		portU = 80
 	}
-	err = binary.Write(writer, binary.BigEndian, port)
-	if err != nil {
-		logger.Warningf("[udp] sock5 convert port failed, err: %v", err)
-		return err
-	}
-	portBy := writer.Bytes()[0:2]
-	buf = append(buf, portBy...)
+	port := make([]byte, 2)
+	binary.BigEndian.PutUint16(port, portU)
+	buf = append(buf, port...)
 	// request proxy connect remote server
 	logger.Debugf("[udp] sock5 send connect request, buf: %v", buf)
 	_, err = rConn.Write(buf)
@@ -200,10 +198,14 @@ func (handler *Sock5Handler) Tunnel(rConn net.Conn, addr *net.UDPAddr) error {
 	| Size (uint16) | Data |
 */
 
-func (handler *Sock5Handler) PutData(buf []byte) error {
-
-
-	return nil
+func (handler *Sock5Handler) PutData(buf []byte) {
+	handler.data.Put(buf)
 }
 
-
+func (handler *Sock5Handler) Get() []byte {
+	iBuf, ok := handler.data.Get().([]byte)
+	if !ok {
+		logger.Warningf("get sock data is not []byte")
+	}
+	return iBuf
+}

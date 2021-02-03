@@ -1,7 +1,6 @@
 package TcpProxy
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -133,18 +132,13 @@ func (handler *Sock5Handler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
 		buf = append(buf, addr.IP...)
 	}
 	// convert port 2 byte
-	writer := new(bytes.Buffer)
-	port := uint16(addr.Port)
-	if port == 0 {
-		port = 80
+	portU := uint16(addr.Port)
+	if portU == 0 {
+		portU = 80
 	}
-	err = binary.Write(writer, binary.BigEndian, port)
-	if err != nil {
-		logger.Warningf("sock5 convert port failed, err: %v", err)
-		return err
-	}
-	portBy := writer.Bytes()[0:2]
-	buf = append(buf, portBy...)
+	var port []byte
+	binary.BigEndian.PutUint16(port, portU)
+	buf = append(buf, port...)
 	// request proxy connect remote server
 	logger.Debugf("sock5 send connect request, buf: %v", buf)
 	_, err = rConn.Write(buf)

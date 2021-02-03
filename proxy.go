@@ -76,6 +76,11 @@ func NewUdpProxy() {
 			logger.Fatal(err)
 		}
 
+		_, err = conn.WriteTo(buf, lAddr)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
 		msgs, err := syscall.ParseSocketControlMessage(oob[:oobn])
 		if err != nil {
 			logger.Fatal(err)
@@ -109,19 +114,22 @@ func NewUdpProxy() {
 			continue
 		}
 
+		buf = udpProxy.MarshalUdpPackage(udpProxy.UdpPackage{Addr: *udpAddr, Data: buf})
 		_, err = handler.RemoteHandler.Write(buf)
 		if err != nil {
 			logger.Fatal(err)
 		}
 
-		go func(con net.Conn) {
-			logger.Debug("start read...")
-			_, err = con.Read(buf)
-			if err != nil {
-				logger.Warning(err)
-			}
-			logger.Debug(buf)
-		}(handler.RemoteHandler)
+		buf = make([]byte, 512)
+		_, err = handler.RemoteHandler.Read(buf)
+		if err != nil {
+			logger.Fatal(err)
+		}
+		pkg := udpProxy.UnMarshalUdpPackage(buf)
+		_, err = conn.WriteTo(pkg.Data, lAddr)
+		if err != nil {
+			logger.Fatal(err)
+		}
 	}
 }
 
