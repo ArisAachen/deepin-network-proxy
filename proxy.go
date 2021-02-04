@@ -76,11 +76,6 @@ func NewUdpProxy() {
 			logger.Fatal(err)
 		}
 
-		_, err = conn.WriteTo(buf, lAddr)
-		if err != nil {
-			logger.Fatal(err)
-		}
-
 		msgs, err := syscall.ParseSocketControlMessage(oob[:oobn])
 		if err != nil {
 			logger.Fatal(err)
@@ -126,10 +121,26 @@ func NewUdpProxy() {
 			logger.Fatal(err)
 		}
 		pkg := udpProxy.UnMarshalUdpPackage(buf)
-		_, err = conn.WriteTo(pkg.Data, lAddr)
+
+		pConn, err := udpProxy.DialUDP("udp", udpAddr, lAddr)
 		if err != nil {
-			logger.Fatal(err)
+			logger.Fatalf("dial failed, err: %v", err)
 		}
+		udpProxy.GetUdpAddr(*pConn)
+
+		_, err = pConn.Write(pkg.Data)
+		if err != nil {
+			logger.Fatal("dial failed, err: %v", err)
+		}
+		buf = make([]byte, 512)
+		_, err = pConn.Read(buf)
+		if err != nil {
+			logger.Fatal("dial failed, err: %v", err)
+		}
+		//_, err = conn.WriteTo(pkg.Data, lAddr)
+		//if err != nil {
+		//	logger.Fatal(err)
+		//}
 	}
 }
 
