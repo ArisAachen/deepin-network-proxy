@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"net"
 	"pkg.deepin.io/lib/log"
 	"strconv"
@@ -71,27 +70,14 @@ func NewUdpProxy() {
 	for {
 		buf := make([]byte, 512)
 		oob := make([]byte, 1024)
-		_, oobn, _, lAddr, err := conn.ReadMsgUDP(buf, oob)
+		_, oobNum, _, lAddr, err := conn.ReadMsgUDP(buf, oob)
 		if err != nil {
 			logger.Fatal(err)
 		}
 
-		msgs, err := syscall.ParseSocketControlMessage(oob[:oobn])
+		udpAddr, err := com.ParseRemoteAddrFromMsgHdr(oob[:oobNum])
 		if err != nil {
-			logger.Fatal(err)
-		}
 
-		var udpAddr *net.UDPAddr = nil
-		for _, msg := range msgs {
-			if msg.Header.Level == syscall.SOL_IP && msg.Header.Type == syscall.IP_RECVORIGDSTADDR {
-				ip := net.IP(msg.Data[4:8])
-				port := binary.BigEndian.Uint16(msg.Data[2:4])
-				logger.Infof("result is %v %v", ip, port)
-				udpAddr = &net.UDPAddr{
-					IP:   msg.Data[4:8],
-					Port: int(msg.Data[2])<<8 + int(msg.Data[3]),
-				}
-			}
 		}
 
 		logger.Infof("recv buf is %v", buf)
@@ -122,11 +108,10 @@ func NewUdpProxy() {
 		}
 		pkg := udpProxy.UnMarshalUdpPackage(buf)
 
-		pConn, err := udpProxy.DialUDP("udp", udpAddr, lAddr)
+		pConn, err := udpProxy.MegaDial("", udpAddr, lAddr)
 		if err != nil {
 			logger.Fatalf("dial failed, err: %v", err)
 		}
-		udpProxy.GetUdpAddr(*pConn)
 
 		_, err = pConn.Write(pkg.Data)
 		if err != nil {
@@ -137,10 +122,6 @@ func NewUdpProxy() {
 		if err != nil {
 			logger.Fatal("dial failed, err: %v", err)
 		}
-		//_, err = conn.WriteTo(pkg.Data, lAddr)
-		//if err != nil {
-		//	logger.Fatal(err)
-		//}
 	}
 }
 
