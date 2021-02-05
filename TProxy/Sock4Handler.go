@@ -1,8 +1,9 @@
-package TcpProxy
+package TProxy
 
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 
@@ -23,7 +24,12 @@ func NewSock4Handler(local net.Conn, proxy Config.Proxy) *Sock4Handler {
 	return handler
 }
 
-func (handler *Sock4Handler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
+func (handler *Sock4Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
+	tcpAddr, ok := addr.(*net.UDPAddr)
+	if !ok {
+		logger.Warning("[tcp] tunnel addr type is not udp")
+		return errors.New("type is not udp")
+	}
 	// sock4 dont support password auth
 	auth := auth{
 		user: handler.proxy.UserName,
@@ -40,7 +46,7 @@ func (handler *Sock4Handler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
 	buf[1] = 1 // connect command
 	// convert port 2 byte
 	writer := new(bytes.Buffer)
-	port := uint16(addr.Port)
+	port := uint16(tcpAddr.Port)
 	if port == 0 {
 		port = 80
 	}
@@ -52,7 +58,7 @@ func (handler *Sock4Handler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
 	portBy := writer.Bytes()[0:2]
 	buf = append(buf, portBy...)
 	// add ip and user
-	buf = append(buf, addr.IP...)
+	buf = append(buf, tcpAddr.IP...)
 	if auth.user != "" {
 		buf = append(buf, []byte(auth.user)...)
 	} else {
@@ -85,7 +91,7 @@ func (handler *Sock4Handler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
 		return fmt.Errorf("sock4 proto is invalid, sock type: %v, code: %v", buf[0], buf[1])
 	}
 	logger.Debugf("sock4 proxy: tunnel create success, [%s] -> [%s] -> [%s]",
-		handler.localHandler.RemoteAddr(), rConn.RemoteAddr(), addr.String())
+		handler.localHandler.RemoteAddr(), rConn.RemoteAddr(), tcpAddr.String())
 	// save remote handler
 	handler.remoteHandler = rConn
 	return nil

@@ -1,8 +1,9 @@
-package TcpProxy
+package TProxy
 
 import (
 	"bufio"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -34,7 +35,13 @@ func NewHttpHandler(local net.Conn, proxy Config.Proxy) *HttpHandler {
 }
 
 // create tunnel between proxy and server
-func (handler *HttpHandler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
+func (handler *HttpHandler) Tunnel(rConn net.Conn, addr net.Addr) error {
+	// check type
+	tcpAddr, ok := addr.(*net.UDPAddr)
+	if !ok {
+		logger.Warning("[tcp] tunnel tcpAddr type is not udp")
+		return errors.New("type is not udp")
+	}
 	// auth
 	auth := auth{
 		user:     handler.proxy.UserName,
@@ -43,9 +50,9 @@ func (handler *HttpHandler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
 	// create http head
 	req := &http.Request{
 		Method: http.MethodConnect,
-		Host:   addr.String(),
+		Host:   tcpAddr.String(),
 		URL: &url.URL{
-			Host: addr.String(),
+			Host: tcpAddr.String(),
 		},
 		Header: http.Header{
 			//"Proxy-Connection": []string{"Keep-Alive"},
@@ -76,7 +83,7 @@ func (handler *HttpHandler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
 			resp.StatusCode, resp.Status)
 	}
 	logger.Debugf("http proxy: tunnel create success, [%s] -> [%s] -> [%s]",
-		handler.localHandler.RemoteAddr(), rConn.RemoteAddr(), addr.String())
+		handler.localHandler.RemoteAddr(), rConn.RemoteAddr(), tcpAddr.String())
 	// save remote handler
 	handler.remoteHandler = rConn
 	return nil

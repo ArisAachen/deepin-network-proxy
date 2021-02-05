@@ -40,6 +40,40 @@ func GetTcpRemoteAddr(conn *net.TCPConn) (*net.TCPAddr, error) {
 	return tcpAddr, nil
 }
 
+// set conn opt transparent
+func SetConnOptTrn(conn net.Conn) error {
+	// check if is the same type, udp addr can not dial tcp addr
+	if reflect.TypeOf(conn) != reflect.TypeOf(net.UDPConn{}) && reflect.TypeOf(conn) != reflect.TypeOf(net.TCPConn{}) {
+		return errors.New("conn type is not udp conn and tcp conn")
+	}
+	/*
+		udp conn and tcp conn have all File() method
+			type conn struct {
+				fd *netFD
+			}
+			func (c *conn) File() (f *os.File, err error)
+	*/
+	// call File() method
+	value := reflect.ValueOf(conn)
+	call := value.MethodByName("File").Call(nil)
+	if len(call) != 2 {
+		return errors.New("return of file method is not match")
+	}
+	// check err
+	if err, ok := call[1].Interface().(error); !ok {
+		return errors.New("convert error failed")
+	} else if err != nil {
+		return err
+	}
+	// convert file
+	file, ok := call[0].Interface().(*os.File)
+	if !ok {
+		return errors.New("convert file failed")
+	}
+	// set sock opt trn
+	return SetSockOptTrn(int(file.Fd()))
+}
+
 // set socket transparent
 func SetSockOptTrn(fd int) error {
 	soTyp, err := syscall.GetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_TYPE)
@@ -170,6 +204,7 @@ func convertAddrToSockAddr(addr net.Addr) (syscall.Sockaddr, error) {
 	if port == 0 {
 		port = 80
 	}
+	// convert addr and port
 	if ip.To4() != nil {
 		inet4 := &syscall.SockaddrInet4{
 			Port: int(port),
@@ -184,4 +219,72 @@ func convertAddrToSockAddr(addr net.Addr) (syscall.Sockaddr, error) {
 		return inet6, nil
 	}
 	return nil, errors.New("ip is not ipv4 or ipv6")
+}
+
+type DataPackage struct {
+	Addr net.Addr
+	Data []byte
+}
+
+// marshal data, now only useful for udp
+func MarshalPackage(pkg DataPackage, proto string) []byte {
+	/*
+			sock5 udp data
+		   +----+------+--------+----------+----------+------+
+		   |RSV | FRAG |  ATYP  | DST.ADDR | DST.PORT | DATA |
+		   +----+------+--------+------+----------+----------+
+		   | 1  |  0   |    1   | Variable | Variable | Data |
+		   +----+------+--------+----------+----------+------+
+	*/
+	// message
+	addr := pkg.Addr
+	var ip net.IP = reflect.ValueOf(addr).FieldByName("IP").Bytes()
+	port16 := reflect.ValueOf(addr).FieldByName("Port").Uint()
+	data := pkg.Data
+	// udp message protocol
+	buf := make([]byte, 4)
+	buf[0] = 0
+	// only udp is valid
+	switch proto {
+	case "tcp":
+		return nil
+	case "udp":
+		buf[1] = 0
+	default:
+		return nil
+	}
+	buf[1] = 0
+	buf[2] = 0
+	if ip.To4() != nil {
+		buf[3] = 1
+		buf = append(buf, ip.To4()...)
+	} else if ip.To16() != nil {
+		buf[3] = 1
+		buf = append(buf, ip.To16()...)
+	} else {
+		buf[3] = 3
+		buf = append(buf, ip...)
+	}
+	// convert port 2 byte
+
+	port := make([]byte, 2)
+	binary.BigEndian.PutUint16(port, uint16(port16))
+	buf = append(buf, port...)
+	// add data
+	buf = append(buf, data...)
+	return buf
+}
+
+func UnMarshalPackage(msg []byte) DataPackage {
+	addr := msg[4:8]
+	port := binary.BigEndian.Uint16(msg[8:10])
+	data := msg[10:]
+
+	return DataPackage{
+		Addr: &net.UDPAddr{
+			IP:   addr[:],
+			Port: int(port),
+		},
+		Data: data,
+	}
 }

@@ -1,4 +1,4 @@
-package TcpProxy
+package TProxy
 
 import (
 	"io"
@@ -13,7 +13,7 @@ import (
 var logger *log.Logger
 
 type BaseHandler interface {
-	Tunnel(rConn net.Conn, addr *net.TCPAddr) error
+	Tunnel(rConn net.Conn, addr net.Addr) error
 }
 
 // dial proxy

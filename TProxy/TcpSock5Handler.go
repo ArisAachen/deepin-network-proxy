@@ -1,7 +1,8 @@
-package TcpProxy
+package TProxy
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 
@@ -9,15 +10,15 @@ import (
 	"pkg.deepin.io/lib/log"
 )
 
-type Sock5Handler struct {
+type TcpSock5Handler struct {
 	localHandler  net.Conn
 	remoteHandler net.Conn
 	proxy         Config.Proxy
 }
 
-func NewSock5Handler(local net.Conn, proxy Config.Proxy) *Sock5Handler {
+func NewSock5Handler(local net.Conn, proxy Config.Proxy) *TcpSock5Handler {
 	logger.SetLogLevel(log.LevelDebug)
-	handler := &Sock5Handler{
+	handler := &TcpSock5Handler{
 		localHandler: local,
 		proxy:        proxy,
 	}
@@ -25,7 +26,13 @@ func NewSock5Handler(local net.Conn, proxy Config.Proxy) *Sock5Handler {
 }
 
 // create tunnel between proxy and server
-func (handler *Sock5Handler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
+func (handler *TcpSock5Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
+	// check type
+	tcpAddr, ok := addr.(*net.UDPAddr)
+	if !ok {
+		logger.Warning("[tcp] tunnel addr type is not udp")
+		return errors.New("type is not udp")
+	}
 	// auth message
 	auth := auth{
 		user:     handler.proxy.UserName,
@@ -120,19 +127,19 @@ func (handler *Sock5Handler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
 	buf[0] = 5
 	buf[1] = 1 // connect
 	buf[2] = 0 // reserved
-	// add addr
-	if addr.IP.To4() != nil {
+	// add tcpAddr
+	if tcpAddr.IP.To4() != nil {
 		buf[3] = 1
-		buf = append(buf, addr.IP.To4()...)
-	} else if addr.IP.To16() != nil {
+		buf = append(buf, tcpAddr.IP.To4()...)
+	} else if tcpAddr.IP.To16() != nil {
 		buf[3] = 4
-		buf = append(buf, addr.IP.To16()...)
+		buf = append(buf, tcpAddr.IP.To16()...)
 	} else {
 		buf[3] = 3
-		buf = append(buf, addr.IP...)
+		buf = append(buf, tcpAddr.IP...)
 	}
 	// convert port 2 byte
-	portU := uint16(addr.Port)
+	portU := uint16(tcpAddr.Port)
 	if portU == 0 {
 		portU = 80
 	}
@@ -159,7 +166,7 @@ func (handler *Sock5Handler) Tunnel(rConn net.Conn, addr *net.TCPAddr) error {
 		return fmt.Errorf("incorrect sock5 connect reponse, version: %v, code: %v", buf[0], buf[1])
 	}
 	logger.Debugf("sock5 proxy: tunnel create success, [%s] -> [%s] -> [%s]",
-		handler.localHandler.RemoteAddr(), rConn.RemoteAddr(), addr.String())
+		handler.localHandler.RemoteAddr(), rConn.RemoteAddr(), tcpAddr.String())
 	// save remote handler
 	handler.remoteHandler = rConn
 	return nil

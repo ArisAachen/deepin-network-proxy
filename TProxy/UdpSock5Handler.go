@@ -1,38 +1,30 @@
-package UdpProxy
+package TProxy
 
 import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/DeepinProxy/Config"
 	"net"
-	"pkg.deepin.io/lib/log"
+
+	"github.com/DeepinProxy/Config"
 )
 
-type Sock5Handler struct {
+type UdpSock5Handler struct {
 	localHandler  net.Conn
-	RemoteHandler net.Conn
+	remoteHandler net.Conn
 	proxy         Config.Proxy
 }
 
-var logger *log.Logger
-
-func NewSock5Handler(local net.Conn, proxy Config.Proxy) *Sock5Handler {
-	handler := &Sock5Handler{
+func NewUdpSock5Handler(local net.Conn, proxy Config.Proxy) *UdpSock5Handler {
+	handler := &UdpSock5Handler{
 		localHandler: local,
 		proxy:        proxy,
 	}
 	return handler
 }
 
-// auth message
-type auth struct {
-	user     string
-	password string
-}
-
 // create tunnel between proxy and server
-func (handler *Sock5Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
+func (handler *UdpSock5Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
 	// check type
 	udpAddr, ok := addr.(*net.UDPAddr)
 	if !ok {
@@ -186,6 +178,6 @@ func (handler *Sock5Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
 		handler.localHandler.RemoteAddr(), udpServer.String(), addr.String())
 	// save remote handler
 
-	handler.RemoteHandler = udpConn
+	handler.remoteHandler = udpConn
 	return nil
 }
