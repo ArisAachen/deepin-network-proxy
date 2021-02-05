@@ -16,7 +16,7 @@ type TcpSock5Handler struct {
 	proxy         Config.Proxy
 }
 
-func NewSock5Handler(local net.Conn, proxy Config.Proxy) *TcpSock5Handler {
+func NewTcpSock5Handler(local net.Conn, proxy Config.Proxy) *TcpSock5Handler {
 	logger.SetLogLevel(log.LevelDebug)
 	handler := &TcpSock5Handler{
 		localHandler: local,

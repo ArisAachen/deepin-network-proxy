@@ -8,8 +8,7 @@ import (
 
 	com "github.com/DeepinProxy/Com"
 	cfg "github.com/DeepinProxy/Config"
-	tcpProxy "github.com/DeepinProxy/TcpProxy"
-	udpProxy "github.com/DeepinProxy/UdpProxy"
+	tProxy "github.com/DeepinProxy/TProxy"
 )
 
 var logger = log.NewLogger("daemon/proxy")
@@ -89,25 +88,25 @@ func NewUdpProxy(lsp string, proxy cfg.Proxy) {
 			continue
 		}
 
-		handler := udpProxy.NewSock5Handler(lConn, proxy)
+		handler := tProxy.NewSock5Handler(lConn, proxy)
 		err = handler.Tunnel(remoteConn, rAddr)
 		if err != nil {
 			logger.Warningf("tunnel failed, err: %v", err)
 			continue
 		}
 
-		buf = udpProxy.MarshalUdpPackage(com.DataPackage{Addr: rAddr, Data: buf})
-		_, err = handler.RemoteHandler.Write(buf)
-		if err != nil {
-			logger.Fatal(err)
-		}
-
-		buf = make([]byte, 512)
-		_, err = handler.RemoteHandler.Read(buf)
-		if err != nil {
-			logger.Fatal(err)
-		}
-		pkg := com.UnMarshalPackage(buf)
+		buf = tProxy.MarshalUdpPackage(com.DataPackage{Addr: rAddr, Data: buf})
+		//_, err = handler.RemoteHandler.Write(buf)
+		//if err != nil {
+		//	logger.Fatal(err)
+		//}
+		//
+		//buf = make([]byte, 512)
+		//_, err = handler.RemoteHandler.Read(buf)
+		//if err != nil {
+		//	logger.Fatal(err)
+		//}
+		//pkg := com.UnMarshalPackage(buf)
 
 		//pConn, err := udpProxy.MegaDial(rAddr, lAddr)
 		//if err != nil {
@@ -168,7 +167,7 @@ func NewTcpProxy(listen string) {
 			continue
 		}
 		// create handler
-		handler := tcpProxy.NewHandler(localConn, proxy, "sock5")
+		handler := tProxy.NewHandler(localConn, proxy, "sock5")
 		// dial proxy server
 		addr := proxy.Server
 		port := strconv.Itoa(proxy.Port)
@@ -187,6 +186,6 @@ func NewTcpProxy(listen string) {
 			err = localConn.Close()
 			err = remoteConn.Close()
 		}
-		tcpProxy.Communicate(localConn, remoteConn)
+		tProxy.Communicate(localConn, remoteConn)
 	}
 }
