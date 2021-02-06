@@ -7,30 +7,44 @@ import (
 	"net"
 
 	"github.com/DeepinProxy/Config"
-	"pkg.deepin.io/lib/log"
 )
 
 type TcpSock5Handler struct {
-	localHandler  net.Conn
-	remoteHandler net.Conn
-	proxy         Config.Proxy
+	handlerPrv
 }
 
-func NewTcpSock5Handler(local net.Conn, proxy Config.Proxy) *TcpSock5Handler {
-	logger.SetLogLevel(log.LevelDebug)
+func NewTcpSock5Handler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *TcpSock5Handler {
+	// create new handler
 	handler := &TcpSock5Handler{
-		localHandler: local,
-		proxy:        proxy,
+		handlerPrv: handlerPrv{
+			// config
+			scope: scope,
+			key:   key,
+			proxy: proxy,
+
+			// connection
+			lAddr: lAddr,
+			rAddr: rAddr,
+			lConn: lConn,
+		},
 	}
+	// add self to private parent
+	handler.saveParent(handler)
 	return handler
 }
 
 // create tunnel between proxy and server
-func (handler *TcpSock5Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
+func (handler *TcpSock5Handler) Tunnel() error {
+	// dial proxy server
+	rConn, err := handler.dialProxy()
+	if err != nil {
+		logger.Warningf("[sock5] failed to dial proxy server, err: %v", err)
+		return err
+	}
 	// check type
-	tcpAddr, ok := addr.(*net.UDPAddr)
+	tcpAddr, ok := handler.rAddr.(*net.TCPAddr)
 	if !ok {
-		logger.Warning("[tcp] tunnel addr type is not udp")
+		logger.Warning("[sock5] tunnel addr type is not tcp")
 		return errors.New("type is not udp")
 	}
 	// auth message
@@ -57,9 +71,9 @@ func (handler *TcpSock5Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
 		buf = append(buf, byte(2))
 	}
 	// sock5 hand shake
-	_, err := rConn.Write(buf)
+	_, err = rConn.Write(buf)
 	if err != nil {
-		logger.Warningf("sock5 hand shake request failed, err: %v", err)
+		logger.Warningf("[sock5] hand shake request failed, err: %v", err)
 		return err
 	}
 	/*
@@ -72,10 +86,10 @@ func (handler *TcpSock5Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
 	*/
 	_, err = rConn.Read(buf)
 	if err != nil {
-		logger.Warningf("sock5 hand shake response failed, err: %v", err)
+		logger.Warningf("[sock5] hand shake response failed, err: %v", err)
 		return err
 	}
-	logger.Debugf("sock5 hand shake response success message auth method: %v", buf[1])
+	logger.Debugf("[sock5] hand shake response success message auth method: %v", buf[1])
 	if buf[0] != 5 || (buf[1] != 0 && buf[1] != 2) {
 		return fmt.Errorf("sock5 proto is invalid, sock type: %v, method: %v", buf[0], buf[1])
 	}
@@ -98,21 +112,21 @@ func (handler *TcpSock5Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
 		// write auth message to writer
 		_, err = rConn.Write(buf)
 		if err != nil {
-			logger.Warningf("sock5 auth request failed, err: %v", err)
+			logger.Warningf("[sock5] auth request failed, err: %v", err)
 			return err
 		}
 		buf = make([]byte, 32)
 		_, err = rConn.Read(buf)
 		if err != nil {
-			logger.Warningf("sock5 auth response failed, err: %v", err)
+			logger.Warningf("[sock5] auth response failed, err: %v", err)
 			return err
 		}
 		// RFC1929 user/pass auth should return 1, but some sock5 return 5
 		if buf[0] != 5 && buf[0] != 1 {
-			logger.Warningf("sock5 auth response incorrect code, code: %v", buf[0])
+			logger.Warningf("[sock5] auth response incorrect code, code: %v", buf[0])
 			return fmt.Errorf("incorrect sock5 auth response, code: %v", buf[0])
 		}
-		logger.Debugf("sock5 auth success, code: %v", buf[0])
+		logger.Debugf("[sock5] auth success, code: %v", buf[0])
 	}
 	/*
 			sock5 connect request
@@ -146,28 +160,28 @@ func (handler *TcpSock5Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
 	var port []byte
 	binary.BigEndian.PutUint16(port, portU)
 	buf = append(buf, port...)
-	// request proxy connect remote server
-	logger.Debugf("sock5 send connect request, buf: %v", buf)
+	// request proxy connect rConn server
+	logger.Debugf("[sock5] send connect request, buf: %v", buf)
 	_, err = rConn.Write(buf)
 	if err != nil {
-		logger.Warningf("sock5 send connect request failed, err: %v", err)
+		logger.Warningf("[sock5] send connect request failed, err: %v", err)
 		return err
 	}
-	logger.Debugf("sock5 request successfully")
+	logger.Debugf("[sock5] request successfully")
 	buf = make([]byte, 16)
 	_, err = rConn.Read(buf)
 	if err != nil {
-		logger.Warningf("sock5 connect response failed, err: %v", err)
+		logger.Warningf("[sock5] connect response failed, err: %v", err)
 		return err
 	}
-	logger.Debugf("sock5 response successfully, buf: %v", buf)
+	logger.Debugf("[sock5] response successfully, buf: %v", buf)
 	if buf[0] != 5 || buf[1] != 0 {
-		logger.Warningf("sock5 connect response failed, version: %v, code: %v", buf[0], buf[1])
+		logger.Warningf("[sock5] connect response failed, version: %v, code: %v", buf[0], buf[1])
 		return fmt.Errorf("incorrect sock5 connect reponse, version: %v, code: %v", buf[0], buf[1])
 	}
-	logger.Debugf("sock5 proxy: tunnel create success, [%s] -> [%s] -> [%s]",
-		handler.localHandler.RemoteAddr(), rConn.RemoteAddr(), tcpAddr.String())
-	// save remote handler
-	handler.remoteHandler = rConn
+	logger.Debugf("[sock5] proxy: tunnel create success, [%s] -> [%s] -> [%s]",
+		handler.lAddr.String(), rConn.RemoteAddr(), handler.rAddr.String())
+	// save rConn handler
+	handler.rConn = rConn
 	return nil
 }

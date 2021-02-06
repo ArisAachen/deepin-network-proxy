@@ -95,27 +95,33 @@ func SetSockOptTrn(fd int) error {
 	return nil
 }
 
+// addr type for udp and tcp
+type BaseAddr struct {
+	IP   net.IP
+	Port int
+}
+
 // parse origin remote addr msg from msg_hdr
-func ParseRemoteAddrFromMsgHdr(buf []byte) (net.Addr, error) {
+func ParseRemoteAddrFromMsgHdr(buf []byte) (*BaseAddr, error) {
+	var addr *BaseAddr
 	if buf == nil {
-		return nil, errors.New("parse buf is nil")
+		return addr, errors.New("parse buf is nil")
 	}
 	// parse control message
 	msgSl, err := syscall.ParseSocketControlMessage(buf)
 	if err != nil {
-		return nil, err
+		return addr, err
 	}
-	var addr *net.TCPAddr
 	// tcp and udp addr is the same struct, use tcp to represent all
 	for _, msg := range msgSl {
 		// use t_proxy and ip route, msg_hdr address is marked as sol_ip type
 		if msg.Header.Level == syscall.SOL_IP && msg.Header.Type == syscall.IP_RECVORIGDSTADDR {
-			addr = &net.TCPAddr{
+			addr = &BaseAddr{
 				IP:   msg.Data[4:8],
 				Port: int(binary.BigEndian.Uint16(msg.Data[2:4])),
 			}
 		} else if msg.Header.Level == syscall.SOL_IPV6 && msg.Header.Type == syscall.IP_RECVORIGDSTADDR {
-			addr = &net.TCPAddr{
+			addr = &BaseAddr{
 				IP:   msg.Data[8:24],
 				Port: int(binary.BigEndian.Uint16(msg.Data[2:4])),
 			}

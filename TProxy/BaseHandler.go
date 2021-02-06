@@ -13,62 +13,11 @@ import (
 
 var logger *log.Logger
 
-// general method
-
-type Communication struct {
-}
-
-func (c *Communication) Communicate(local net.Conn, remote net.Conn) {
-	// local to remote
-	go func() {
-		logger.Debug("copy local -> remote")
-		_, err := io.Copy(local, remote)
-		if err != nil {
-			logger.Debugf("local to remote closed")
-			// ignore close failed
-			err = local.Close()
-			err = remote.Close()
-		}
-	}()
-	// remote to local
-	go func() {
-		logger.Debugf("copy remote -> local")
-		_, err := io.Copy(remote, local)
-		if err != nil {
-			logger.Debugf("remote to local closed")
-			// ignore close failed
-			err = local.Close()
-			err = remote.Close()
-		}
-	}()
-}
-
-// handler private
-type handlerPrv struct {
-	local  net.Conn
-	remote net.Conn
-	key    HandlerKey
-	proxy  Config.Proxy
-	mgr    HandlerMgr
-}
-
-func newHandlerPrv(local net.Conn, remote net.Conn, key HandlerKey, proxy Config.Proxy) *handlerPrv {
-	return &handlerPrv{
-		local:  local,
-		remote: remote,
-		key:    key,
-		proxy:  proxy,
-	}
-}
-
-func (pr *handlerPrv) AddMgr() {
-
-}
-
 // handler module
 
 type BaseHandler interface {
-	Tunnel(rConn net.Conn, addr net.Addr) error
+	Tunnel() error
+	Communicate()
 	Close()
 }
 
@@ -79,18 +28,35 @@ const (
 	AppProxy
 )
 
+// proxy server
+type proxyServer struct {
+	server string
+	port   int
+	auth
+}
+
+// auth message
+type auth struct {
+	user     string
+	password string
+}
+
 // handler key in case keep the same handler
 type HandlerKey struct {
-	SrcIP   string
-	srcPort int
-	DstIP   string
-	DstPort int
+	SrcAddr string
+	DstAddr string
 }
 
 // manager all handler
 type HandlerMgr struct {
 	handlerLock sync.RWMutex
 	handlerMap  map[ProxyScope]map[HandlerKey]BaseHandler // handlerMap sync.Map
+}
+
+func NewHandlerMsg() *HandlerMgr {
+	return &HandlerMgr{
+		handlerMap: make(map[ProxyScope]map[HandlerKey]BaseHandler),
+	}
 }
 
 // add handler to mgr
@@ -112,12 +78,17 @@ func (mgr *HandlerMgr) AddHandler(scope ProxyScope, key HandlerKey, base BaseHan
 		baseMap = make(map[HandlerKey]BaseHandler)
 	}
 	// check if handler already exist
-	preBase, ok := baseMap[key]
+	_, ok := baseMap[key]
 	if ok {
-		preBase.Close()
-		delete(baseMap, key)
+		// if exist already, should ignore
+		logger.Debugf("key has already in map, scope: %v, key: %v", scope, key)
+		return
+		//preBase.Close()
+		//delete(baseMap, key)
 	}
+	// add handler
 	baseMap[key] = base
+	logger.Debugf("handler add to manager success, scope: %v, key: %v", scope, key)
 }
 
 // close and remove base handler
@@ -174,23 +145,23 @@ func DialProxy(proxy Config.Proxy) (net.Conn, error) {
 
 // conn communicate
 func Communicate(local net.Conn, remote net.Conn) {
-	// local to remote
+	// lConn to rConn
 	go func() {
-		logger.Debug("copy local -> remote")
+		logger.Debug("copy lConn -> rConn")
 		_, err := io.Copy(local, remote)
 		if err != nil {
-			logger.Debugf("local to remote closed")
+			logger.Debugf("lConn to rConn closed")
 			// ignore close failed
 			err = local.Close()
 			err = remote.Close()
 		}
 	}()
-	// remote to local
+	// rConn to lConn
 	go func() {
-		logger.Debugf("copy remote -> local")
+		logger.Debugf("copy rConn -> lConn")
 		_, err := io.Copy(remote, local)
 		if err != nil {
-			logger.Debugf("remote to local closed")
+			logger.Debugf("rConn to lConn closed")
 			// ignore close failed
 			err = local.Close()
 			err = remote.Close()
@@ -198,15 +169,17 @@ func Communicate(local net.Conn, remote net.Conn) {
 	}()
 }
 
-func NewHandler(local net.Conn, proxy Config.Proxy, proto string) BaseHandler {
+func NewHandler(proto string, scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) BaseHandler {
 	// search proto
 	switch proto {
 	case "http":
-		return NewHttpHandler(local, proxy)
+		return NewHttpHandler(scope, key, proxy, lAddr, rAddr, lConn)
 	case "sock4":
-		return NewSock4Handler(local, proxy)
-	case "sock5":
-		return NewTcpSock5Handler(local, proxy)
+		return NewSock4Handler(scope, key, proxy, lAddr, rAddr, lConn)
+	case "sock5tcp":
+		return NewTcpSock5Handler(scope, key, proxy, lAddr, rAddr, lConn)
+	case "sock5udp":
+		return NewUdpSock5Handler(scope, key, proxy, lAddr, rAddr, lConn)
 	default:
 		logger.Warningf("unknown proto type: %v", proto)
 	}

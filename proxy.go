@@ -12,12 +12,15 @@ import (
 )
 
 var logger = log.NewLogger("daemon/proxy")
+var mgr *tProxy.HandlerMgr
 
 // proxy main
 func main() {
 	var udp bool = true
 	var lsp string = ":8080"
 	var proto string = "sock5"
+
+	mgr = tProxy.NewHandlerMsg()
 
 	// get config
 	config := cfg.NewProxyCfg()
@@ -125,67 +128,85 @@ func NewUdpProxy(lsp string, proxy cfg.Proxy) {
 	}
 }
 
-func NewTcpProxy(listen string) {
-	l, err := net.Listen("tcp", listen)
+func ProxyUdp(scope tProxy.ProxyScope, proxy cfg.Proxy, local net.Addr, remote net.Addr) {
+	// make a fake udp dial to cheat socket
+	lConn, err := com.MegaDial("udp", remote, local)
 	if err != nil {
-		logger.Warningf("listen tcp port failed, err: %v", err)
-		return
+		logger.Warningf("fake dial udp remote to local failed, err: %v", err)
 	}
-	defer l.Close()
-
-	config := cfg.NewProxyCfg()
-	err = config.LoadPxyCfg("/home/aris/Desktop/Proxy.yaml")
-	if err != nil {
-		logger.Warningf("load config failed, err: %v", err)
-		return
+	key := tProxy.HandlerKey{
+		SrcAddr: local.String(),
+		DstAddr: remote.String(),
 	}
+	handler := tProxy.NewHandler("sock5udp", scope, key, proxy, lConn, nil)
 
-	proxy, err := config.GetProxy("global", "sock5")
-	if err != nil {
-		logger.Warningf("get proxy from config failed, err: %v", err)
-		return
-	}
-
-	for {
-		localConn, err := l.Accept()
-		if err != nil {
-			logger.Warningf("accept socket failed, err: %v", err)
-			continue
-		}
-
-		// get remote addr
-		tcpCon, ok := localConn.(*net.TCPConn)
-		if !ok {
-			logger.Warningf("accept conn type is not tcp conn %v", err)
-			err = localConn.Close()
-			continue
-		}
-		tcpAddr, err := com.GetTcpRemoteAddr(tcpCon)
-		if err != nil {
-			logger.Warningf("get remote addr failed, err: %v", err)
-			err = localConn.Close()
-			continue
-		}
-		// create handler
-		handler := tProxy.NewHandler(localConn, proxy, "sock5")
-		// dial proxy server
-		addr := proxy.Server
-		port := strconv.Itoa(proxy.Port)
-		if port == "" {
-			port = "80"
-		}
-		remoteConn, err := net.DialTimeout("tcp", addr+":"+port, 3*time.Second)
-		if err != nil {
-			logger.Warningf("dial remote proxy server failed, err: %v", err)
-			err = localConn.Close()
-			continue
-		}
-		err = handler.Tunnel(remoteConn, tcpAddr)
-		if err != nil {
-			logger.Warningf("create tunnel failed, %v", err)
-			err = localConn.Close()
-			err = remoteConn.Close()
-		}
-		tProxy.Communicate(localConn, remoteConn)
-	}
 }
+
+//func NewTcpProxy(listen string) {
+//	l, err := net.Listen("tcp", listen)
+//	if err != nil {
+//		logger.Warningf("listen tcp port failed, err: %v", err)
+//		return
+//	}
+//	defer l.Close()
+//
+//	config := cfg.NewProxyCfg()
+//	err = config.LoadPxyCfg("/home/aris/Desktop/Proxy.yaml")
+//	if err != nil {
+//		logger.Warningf("load config failed, err: %v", err)
+//		return
+//	}
+//
+//	proxy, err := config.GetProxy("global", "sock5")
+//	if err != nil {
+//		logger.Warningf("get proxy from config failed, err: %v", err)
+//		return
+//	}
+//
+//	for {
+//		localConn, err := l.Accept()
+//		if err != nil {
+//			logger.Warningf("accept socket failed, err: %v", err)
+//			continue
+//		}
+//
+//		// get remote addr
+//		tcpCon, ok := localConn.(*net.TCPConn)
+//		if !ok {
+//			logger.Warningf("accept conn type is not tcp conn %v", err)
+//			err = localConn.Close()
+//			continue
+//		}
+//		tcpAddr, err := com.GetTcpRemoteAddr(tcpCon)
+//		if err != nil {
+//			logger.Warningf("get remote addr failed, err: %v", err)
+//			err = localConn.Close()
+//			continue
+//		}
+//		// create handler
+//		handler := tProxy.NewHandler(localConn, proxy, "sock5")
+//		// dial proxy server
+//		addr := proxy.Server
+//		port := strconv.Itoa(proxy.Port)
+//		if port == "" {
+//			port = "80"
+//		}
+//		remoteConn, err := net.DialTimeout("tcp", addr+":"+port, 3*time.Second)
+//		if err != nil {
+//			logger.Warningf("dial remote proxy server failed, err: %v", err)
+//			err = localConn.Close()
+//			continue
+//		}
+//		err = handler.Tunnel(remoteConn, tcpAddr)
+//		if err != nil {
+//			logger.Warningf("create tunnel failed, %v", err)
+//			err = localConn.Close()
+//			err = remoteConn.Close()
+//		}
+//		tProxy.Communicate(localConn, remoteConn)
+//	}
+//}
+//
+//func Handler() {
+//
+//}

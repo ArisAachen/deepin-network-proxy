@@ -11,23 +11,40 @@ import (
 )
 
 type Sock4Handler struct {
-	localHandler  net.Conn
-	remoteHandler net.Conn
-	proxy         Config.Proxy
+	handlerPrv
 }
 
-func NewSock4Handler(local net.Conn, proxy Config.Proxy) *Sock4Handler {
+func NewSock4Handler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *Sock4Handler {
+	// create new handler
 	handler := &Sock4Handler{
-		localHandler: local,
-		proxy:        proxy,
+		handlerPrv: handlerPrv{
+			// config
+			scope: scope,
+			key:   key,
+			proxy: proxy,
+
+			// connection
+			lAddr: lAddr,
+			rAddr: rAddr,
+			lConn: lConn,
+		},
 	}
+	// add self to private parent
+	handler.saveParent(handler)
 	return handler
 }
 
-func (handler *Sock4Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
-	tcpAddr, ok := addr.(*net.UDPAddr)
+func (handler *Sock4Handler) Tunnel() error {
+	// dial proxy server
+	rConn, err := handler.dialProxy()
+	if err != nil {
+		logger.Warningf("[sock4] failed to dial proxy server, err: %v", err)
+		return err
+	}
+	// check type
+	tcpAddr, ok := handler.rAddr.(*net.TCPAddr)
 	if !ok {
-		logger.Warning("[tcp] tunnel addr type is not udp")
+		logger.Warning("[sock4] tunnel addr type is not udp")
 		return errors.New("type is not udp")
 	}
 	// sock4 dont support password auth
@@ -50,9 +67,9 @@ func (handler *Sock4Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
 	if port == 0 {
 		port = 80
 	}
-	err := binary.Write(writer, binary.LittleEndian, port)
+	err = binary.Write(writer, binary.LittleEndian, port)
 	if err != nil {
-		logger.Warningf("sock4 convert port failed, err: %v", err)
+		logger.Warningf("[sock4] convert port failed, err: %v", err)
 		return err
 	}
 	portBy := writer.Bytes()[0:2]
@@ -64,17 +81,17 @@ func (handler *Sock4Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
 	} else {
 		buf = append(buf, uint8(0))
 	}
-	// request proxy connect remote server
-	logger.Debugf("sock4 send connect request, buf: %v", buf)
+	// request proxy connect rConn server
+	logger.Debugf("[sock4] send connect request, buf: %v", buf)
 	_, err = rConn.Write(buf)
 	if err != nil {
-		logger.Warningf("sock4 send connect request failed, err: %v", err)
+		logger.Warningf("[sock4] send connect request failed, err: %v", err)
 		return err
 	}
 	buf = make([]byte, 32)
 	_, err = rConn.Read(buf)
 	if err != nil {
-		logger.Warningf("sock4 connect response failed, err: %v", err)
+		logger.Warningf("[sock4] connect response failed, err: %v", err)
 		return err
 	}
 	/*
@@ -87,12 +104,12 @@ func (handler *Sock4Handler) Tunnel(rConn net.Conn, addr net.Addr) error {
 	*/
 	// 0   0x5A
 	if buf[0] != 0 || buf[1] != 90 {
-		logger.Warningf("sock4 proto is invalid, sock type: %v, code: %v", buf[0], buf[1])
+		logger.Warningf("[sock4] proto is invalid, sock type: %v, code: %v", buf[0], buf[1])
 		return fmt.Errorf("sock4 proto is invalid, sock type: %v, code: %v", buf[0], buf[1])
 	}
-	logger.Debugf("sock4 proxy: tunnel create success, [%s] -> [%s] -> [%s]",
-		handler.localHandler.RemoteAddr(), rConn.RemoteAddr(), tcpAddr.String())
-	// save remote handler
-	handler.remoteHandler = rConn
+	logger.Debugf("[sock4] proxy: tunnel create success, [%s] -> [%s] -> [%s]",
+		handler.lConn.RemoteAddr(), rConn.RemoteAddr(), tcpAddr.String())
+	// save rConn handler
+	handler.lConn = rConn
 	return nil
 }
