@@ -2,13 +2,11 @@ package main
 
 import (
 	"net"
-	"pkg.deepin.io/lib/log"
-	"strconv"
-	"time"
 
 	com "github.com/DeepinProxy/Com"
 	cfg "github.com/DeepinProxy/Config"
 	tProxy "github.com/DeepinProxy/TProxy"
+	"pkg.deepin.io/lib/log"
 )
 
 var logger = log.NewLogger("daemon/proxy")
@@ -53,14 +51,13 @@ func NewUdpProxy(lsp string, proxy cfg.Proxy) {
 	// ip_transparent
 	conn, ok := l.(*net.UDPConn)
 	if !ok {
-		logger.Warning("")
+		logger.Warning("convert udp data failed")
+		return
 	}
 	err = com.SetConnOptTrn(conn)
-
-	addr := proxy.Server
-	port := strconv.Itoa(proxy.Port)
-	if port == "" {
-		port = "80"
+	if err != nil {
+		logger.Warningf("set conn opt transparent failed, err: %v", err)
+		return
 	}
 
 	for {
@@ -72,74 +69,57 @@ func NewUdpProxy(lsp string, proxy cfg.Proxy) {
 		}
 
 		// get real remote addr
-		rAddr, err := com.ParseRemoteAddrFromMsgHdr(oob[:oobNum])
+		rBaseAddr, err := com.ParseRemoteAddrFromMsgHdr(oob[:oobNum])
 		if err != nil {
 			logger.Fatal(err)
 		}
 
-		// make a fake udp dial to cheat socket
-		lConn, err := com.MegaDial("udp", rAddr, lAddr)
-		if err != nil {
-			logger.Warningf("fake dial udp remote to local failed, err: %v", err)
+		// make remote addr
+		rAddr := &net.UDPAddr{
+			IP:   rBaseAddr.IP,
+			Port: rBaseAddr.Port,
 		}
 
-		logger.Infof("recv buf is %v", buf)
-
-		remoteConn, err := net.DialTimeout("tcp", addr+":"+port, 3*time.Second)
-		if err != nil {
-			logger.Warning(err)
-			continue
-		}
-
-		handler := tProxy.NewSock5Handler(lConn, proxy)
-		err = handler.Tunnel(remoteConn, rAddr)
-		if err != nil {
-			logger.Warningf("tunnel failed, err: %v", err)
-			continue
-		}
-
-		buf = tProxy.MarshalUdpPackage(com.DataPackage{Addr: rAddr, Data: buf})
-		//_, err = handler.RemoteHandler.Write(buf)
-		//if err != nil {
-		//	logger.Fatal(err)
-		//}
-		//
-		//buf = make([]byte, 512)
-		//_, err = handler.RemoteHandler.Read(buf)
-		//if err != nil {
-		//	logger.Fatal(err)
-		//}
-		//pkg := com.UnMarshalPackage(buf)
-
-		//pConn, err := udpProxy.MegaDial(rAddr, lAddr)
-		//if err != nil {
-		//	logger.Fatalf("dial failed, err: %v", err)
-		//}
-		//
-		//_, err = pConn.Write(pkg.Data)
-		//if err != nil {
-		//	logger.Fatal("dial failed, err: %v", err)
-		//}
-		//buf = make([]byte, 512)
-		//_, err = pConn.Read(buf)
-		//if err != nil {
-		//	logger.Fatal("dial failed, err: %v", err)
-		//}
+		// func ProxyUdp(scope tProxy.ProxyScope, proxy cfg.Proxy, local net.Addr, remote net.Addr)
+		go ProxyUdp(tProxy.GlobalProxy, proxy, lAddr, rAddr, buf)
 	}
 }
 
-func ProxyUdp(scope tProxy.ProxyScope, proxy cfg.Proxy, local net.Addr, remote net.Addr) {
+func ProxyUdp(scope tProxy.ProxyScope, proxy cfg.Proxy, lAddr net.Addr, rAddr net.Addr, buf []byte) {
 	// make a fake udp dial to cheat socket
-	lConn, err := com.MegaDial("udp", remote, local)
+	lConn, err := com.MegaDial("udp", rAddr, lAddr)
 	if err != nil {
-		logger.Warningf("fake dial udp remote to local failed, err: %v", err)
+		logger.Warningf("fake dial udp rAddr to lAddr failed, err: %v", err)
+		return
 	}
+	// make key to mark this connection
 	key := tProxy.HandlerKey{
-		SrcAddr: local.String(),
-		DstAddr: remote.String(),
+		SrcAddr: lAddr.String(),
+		DstAddr: rAddr.String(),
 	}
-	handler := tProxy.NewHandler("sock5udp", scope, key, proxy, lConn, nil)
-
+	// create new handler
+	handler := tProxy.NewHandler("sock5udp", scope, key, proxy, lAddr, rAddr, lConn)
+	// create tunnel between proxy server and dst server
+	err = handler.Tunnel()
+	if err != nil {
+		handler.Close()
+		return
+	}
+	// add handler to map
+	handler.AddMgr(mgr)
+	// begin communication
+	handler.Communicate()
+	// write first buf to rAddr
+	pkgData := com.DataPackage{
+		Addr: rAddr,
+		Data: buf,
+	}
+	// write first udp to remote
+	err = handler.WriteRemote(com.MarshalPackage(pkgData, "udp"))
+	if err != nil {
+		handler.Close()
+		return
+	}
 }
 
 //func NewTcpProxy(listen string) {

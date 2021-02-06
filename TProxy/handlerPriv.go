@@ -1,6 +1,7 @@
 package TProxy
 
 import (
+	"errors"
 	"io"
 	"net"
 	"strconv"
@@ -28,6 +29,7 @@ type handlerPrv struct {
 	mgr    *HandlerMgr
 }
 
+// new handler private
 func newHandlerPrv(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr) *handlerPrv {
 	return &handlerPrv{
 		scope: scope,
@@ -44,7 +46,7 @@ func (pr *handlerPrv) saveParent(parent BaseHandler) {
 }
 
 // add private to manager and save manager
-func (pr *handlerPrv) addMgr(mgr *HandlerMgr) {
+func (pr *handlerPrv) AddMgr(mgr *HandlerMgr) {
 	// check parent
 	if pr.parent == nil {
 		logger.Warningf("handler private has no parent")
@@ -71,6 +73,56 @@ func (pr *handlerPrv) dialProxy() (net.Conn, error) {
 	return conn, nil
 }
 
+// read and write
+
+func (pr *handlerPrv) WriteRemote(buf []byte) error {
+	if pr.rConn == nil {
+		return errors.New("remote handler is nil")
+	}
+	_, err := pr.rConn.Write(buf)
+	if err != nil {
+		logger.Warningf("write remote failed, err: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (pr *handlerPrv) WriteLocal(buf []byte) error {
+	if pr.lConn == nil {
+		return errors.New("remote handler is nil")
+	}
+	_, err := pr.lConn.Write(buf)
+	if err != nil {
+		logger.Warningf("write remote failed, err: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (pr *handlerPrv) ReadRemote(buf []byte) error {
+	if pr.rConn == nil {
+		return errors.New("remote handler is nil")
+	}
+	_, err := pr.rConn.Read(buf)
+	if err != nil {
+		logger.Warningf("write remote failed, err: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (pr *handlerPrv) ReadLocal(buf []byte) error {
+	if pr.lConn == nil {
+		return errors.New("remote handler is nil")
+	}
+	_, err := pr.lConn.Read(buf)
+	if err != nil {
+		logger.Warningf("write remote failed, err: %v", err)
+		return err
+	}
+	return nil
+}
+
 // communicate lConn and rConn
 func (pr *handlerPrv) Communicate() {
 	go func() {
@@ -79,7 +131,7 @@ func (pr *handlerPrv) Communicate() {
 		if err != nil {
 			logger.Debugf("stop copy data, local [%s] =x= remote [%s], reason: %v", pr.lAddr.String(), pr.rAddr.String(), err)
 		}
-		pr.Close()
+		pr.Remove()
 	}()
 	go func() {
 		logger.Debugf("begin copy data, remote [%s] -> local [%s]", pr.rAddr.String(), pr.lAddr.String())
@@ -87,12 +139,21 @@ func (pr *handlerPrv) Communicate() {
 		if err != nil {
 			logger.Debugf("stop copy data, remote [%s] =x= local [%s], reason: %v", pr.rAddr.String(), pr.lAddr.String(), err)
 		}
-		pr.Close()
+		pr.Remove()
 	}()
 }
 
 // close handler
 func (pr *handlerPrv) Close() {
-	// manager will close and delete handler
+	if pr.lConn != nil {
+		_ = pr.lConn.Close()
+	}
+	if pr.rConn != nil {
+		_ = pr.rConn.Close()
+	}
+}
+
+// close and delete handler from manager
+func (pr *handlerPrv) Remove() {
 	pr.mgr.CloseBaseHandler(pr.scope, pr.key)
 }

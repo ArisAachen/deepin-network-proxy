@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/DeepinProxy/Com"
 	"github.com/DeepinProxy/Config"
 )
 
 type UdpSock5Handler struct {
 	handlerPrv
+	rTcpConn net.Conn
 }
 
 func NewUdpSock5Handler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *UdpSock5Handler {
@@ -33,14 +35,70 @@ func NewUdpSock5Handler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lA
 	return handler
 }
 
+// rewrite close
+func (handler *UdpSock5Handler) Close() {
+	if handler.rTcpConn != nil {
+		_ = handler.rTcpConn.Close()
+	}
+	handler.handlerPrv.Close()
+}
+
+// rewrite communication
+func (handler *UdpSock5Handler) Communicate() {
+	// local -> remote
+	go func() {
+		defer handler.Close()
+		for {
+			logger.Debugf("begin copy data, local [%s] -> remote [%s]", handler.lAddr.String(), handler.rAddr.String())
+			// read local data
+			buf := make([]byte, 512)
+			err := handler.ReadLocal(buf)
+			if err != nil {
+				logger.Debugf("read local data failed, err: %v", err)
+				return
+			}
+			// write remote data
+			pkgData := Com.MarshalPackage(Com.DataPackage{Addr: handler.rAddr, Data: buf}, "udp")
+			err = handler.WriteRemote(pkgData)
+			if err != nil {
+				logger.Debugf("write remote data failed, err: %v", err)
+				return
+			}
+		}
+	}()
+
+	// remote -> local
+	go func() {
+		defer handler.Close()
+		for {
+			logger.Debugf("begin copy data, remote [%s] -> local [%s]", handler.rAddr.String(), handler.lAddr.String())
+			// read local data
+			buf := make([]byte, 512)
+			err := handler.ReadRemote(buf)
+			if err != nil {
+				logger.Debugf("read remote data failed, err: %v", err)
+				return
+			}
+			// write remote data
+			pkgData := Com.UnMarshalPackage(buf)
+			err = handler.WriteLocal(pkgData.Data)
+			if err != nil {
+				logger.Debugf("write remote data failed, err: %v", err)
+				return
+			}
+		}
+	}()
+}
+
 // create tunnel between proxy and server
 func (handler *UdpSock5Handler) Tunnel() error {
 	// dial proxy server
-	rConn, err := handler.dialProxy()
+	rTcpConn, err := handler.dialProxy()
 	if err != nil {
 		logger.Warningf("[udp] failed to dial proxy server, err: %v", err)
 		return err
 	}
+	handler.rTcpConn = rTcpConn
 	// check type
 	udpAddr, ok := handler.rAddr.(*net.UDPAddr)
 	if !ok {
@@ -71,7 +129,7 @@ func (handler *UdpSock5Handler) Tunnel() error {
 		buf = append(buf, byte(2))
 	}
 	// sock5 hand shake
-	_, err = rConn.Write(buf)
+	_, err = rTcpConn.Write(buf)
 	if err != nil {
 		logger.Warningf("[udp] sock5 hand shake request failed, err: %v", err)
 		return err
@@ -84,7 +142,7 @@ func (handler *UdpSock5Handler) Tunnel() error {
 		| 1  |   1    |
 		+----+--------+
 	*/
-	_, err = rConn.Read(buf)
+	_, err = rTcpConn.Read(buf)
 	if err != nil {
 		logger.Warningf("[udp] sock5 hand shake response failed, err: %v", err)
 		return err
@@ -110,13 +168,13 @@ func (handler *UdpSock5Handler) Tunnel() error {
 		buf = append(buf, byte(len(auth.password)))
 		buf = append(buf, []byte(auth.password)...)
 		// write auth message to writer
-		_, err = rConn.Write(buf)
+		_, err = rTcpConn.Write(buf)
 		if err != nil {
 			logger.Warningf("[udp] sock5 auth request failed, err: %v", err)
 			return err
 		}
 		buf = make([]byte, 32)
-		_, err = rConn.Read(buf)
+		_, err = rTcpConn.Read(buf)
 		if err != nil {
 			logger.Warningf("[udp] sock5 auth response failed, err: %v", err)
 			return err
@@ -160,16 +218,16 @@ func (handler *UdpSock5Handler) Tunnel() error {
 	port := make([]byte, 2)
 	binary.BigEndian.PutUint16(port, portU)
 	buf = append(buf, port...)
-	// request proxy connect rConn server
+	// request proxy connect rTcpConn server
 	logger.Debugf("[udp] sock5 send connect request, buf: %v", buf)
-	_, err = rConn.Write(buf)
+	_, err = rTcpConn.Write(buf)
 	if err != nil {
 		logger.Warningf("[udp] sock5 send connect request failed, err: %v", err)
 		return err
 	}
 	logger.Debugf("[udp] sock5 request successfully")
 	buf = make([]byte, 16)
-	_, err = rConn.Read(buf)
+	_, err = rTcpConn.Read(buf)
 	if err != nil {
 		logger.Warningf("[udp] sock5 connect response failed, err: %v", err)
 		return err
@@ -179,21 +237,20 @@ func (handler *UdpSock5Handler) Tunnel() error {
 		logger.Warningf("[udp] sock5 connect response failed, version: %v, code: %v", buf[0], buf[1])
 		return fmt.Errorf("[udp] incorrect sock5 connect reponse, version: %v, code: %v", buf[0], buf[1])
 	}
-	// dial rConn udp server
+	// dial rTcpConn udp server
 	udpServer := net.UDPAddr{
 		IP:   buf[4:8],
 		Port: int(binary.BigEndian.Uint16(buf[8:10])),
 	}
 	udpConn, err := net.Dial("udp", udpServer.String())
 	if err != nil {
-		logger.Warningf("[udp] dial rConn udp failed, err: %v", err)
+		logger.Warningf("[udp] dial rTcpConn udp failed, err: %v", err)
 		return err
 	}
 
 	logger.Debugf("[udp] sock5 proxy: tunnel create success, [%s] -> [%s] -> [%s]",
 		handler.lAddr.String(), udpServer.String(), handler.rAddr.String())
-	// save rConn handler
-
+	// save rTcpConn handler
 	handler.rConn = udpConn
 	return nil
 }

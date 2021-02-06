@@ -16,9 +16,20 @@ var logger *log.Logger
 // handler module
 
 type BaseHandler interface {
+	// connection
 	Tunnel() error
+
+	// close
+	Close()  // direct close handler
+	Remove() // remove self from map
+	AddMgr(mgr *HandlerMgr)
+
+	// write adn read
+	WriteRemote([]byte) error
+	WriteLocal([]byte) error
+	ReadRemote([]byte) error
+	ReadLocal([]byte) error
 	Communicate()
-	Close()
 }
 
 type ProxyScope int

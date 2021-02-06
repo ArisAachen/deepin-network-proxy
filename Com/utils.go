@@ -43,7 +43,7 @@ func GetTcpRemoteAddr(conn *net.TCPConn) (*net.TCPAddr, error) {
 // set conn opt transparent
 func SetConnOptTrn(conn net.Conn) error {
 	// check if is the same type, udp addr can not dial tcp addr
-	if reflect.TypeOf(conn) != reflect.TypeOf(net.UDPConn{}) && reflect.TypeOf(conn) != reflect.TypeOf(net.TCPConn{}) {
+	if reflect.TypeOf(conn) != reflect.TypeOf(&net.UDPConn{}) && reflect.TypeOf(conn) != reflect.TypeOf(&net.TCPConn{}) {
 		return errors.New("conn type is not udp conn and tcp conn")
 	}
 	/*
@@ -60,9 +60,7 @@ func SetConnOptTrn(conn net.Conn) error {
 		return errors.New("return of file method is not match")
 	}
 	// check err
-	if err, ok := call[1].Interface().(error); !ok {
-		return errors.New("convert error failed")
-	} else if err != nil {
+	if err, ok := call[1].Interface().(error); ok {
 		return err
 	}
 	// convert file
@@ -89,7 +87,7 @@ func SetSockOptTrn(fd int) error {
 		return err
 	}
 	// set ip transparent
-	if err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.IP_TRANSPARENT, 1); err != nil {
+	if err = syscall.SetsockoptInt(fd, syscall.SOL_IP, syscall.IP_TRANSPARENT, 1); err != nil {
 		return err
 	}
 	return nil

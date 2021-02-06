@@ -98,8 +98,3 @@ func (handler *HttpHandler) Tunnel() error {
 	handler.rConn = rConn
 	return nil
 }
-
-// add manager
-func (handler *HttpHandler) AddMgr(mgr *HandlerMgr) {
-	handler.addMgr(mgr)
-}
