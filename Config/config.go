@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"gopkg.in/yaml.v2"
 )
@@ -87,36 +88,39 @@ app:
 
 // proxy type
 type Proxy struct {
-	// ProtoType      string `json:"type"` // http sock4 sock5
-	Name           string   `yaml:"name"`
-	Server         string   `yaml:"server"`
-	Port           int      `yaml:"port"`
-	UserName       string   `yaml:"username"`
-	Password       string   `yaml:"password"`
-	ProxyProgram   []string `yaml:"proxy-program"`
-	NoProxyProgram []string `yaml:"no-proxy-program"` // app dont use proxy
-	WhiteList      []string `yaml:"whitelist"`        // white site dont use proxy
+	// proxy proto type
+	ProtoType string `json:"type"` // http sock4 sock5
+
+	// [proto]&[name] as ident
+	Name string `yaml:"name"`
+
+	// proxy server
+	Server string `yaml:"server"`
+	Port   int    `yaml:"port"`
+
+	// auth message
+	UserName string `yaml:"username"`
+	Password string `yaml:"password"`
+
+	// proxy setting
+	ProxyProgram   []string `yaml:"proxy-program"`    // global proxy will ignore
+	NoProxyProgram []string `yaml:"no-proxy-program"` // app proxy will ignore
+
+	// white list
+	WhiteList []string `yaml:"whitelist"` // white site dont use proxy, not use this time
 }
-
-// single proxy type slice
-type Proxies []Proxy
-
-// proxy type    http sock4 sock5
-type ProxyType struct {
-	Type   string  `yaml:"type"`
-	TypeSl Proxies `yaml:"proxies"`
-}
-
-type ProxyForm []ProxyType
 
 // proxy config
 type ProxyConfig struct {
-	Member map[string]ProxyForm `yaml:"proxy-form"` // map[global,app]map[http,sock4,sock5][]proxy
+	AllProxies map[string]map[string][]Proxy `yaml:"all-proxy"` // map[global,app]map[http,sock4,sock5][]proxy
+	TPort      int                           `yaml:"t-port"`
 }
 
 // create new
 func NewProxyCfg() *ProxyConfig {
-	cfg := new(ProxyConfig)
+	cfg := &ProxyConfig{
+		AllProxies: make(map[string]map[string][]Proxy),
+	}
 	return cfg
 }
 
@@ -162,23 +166,29 @@ func (p *ProxyConfig) LoadPxyCfg(path string) error {
 	return nil
 }
 
-func (p *ProxyConfig) GetProxy(form string, proto string) (Proxy, error) {
-	// get proxy form
-	member, ok := p.Member[form]
+// get proxy from config map, index: [global,app] -> [http,sock4,sock5] -> [proxy-name]
+func (p *ProxyConfig) GetProxy(typ string, proto string, name string) (Proxy, error) {
+	var proxy Proxy
+	// get global or app proxies from all proxies
+	typProxies, ok := p.AllProxies[typ]
 	if !ok {
-		return Proxy{}, errors.New("form dont found in proxy map")
+		return proxy, fmt.Errorf("proxy type [%s] cant found any proxy in all proxies map", typ)
 	}
-	// find proto
-	var typeSl Proxies
-	for _, py := range member {
-		if py.Type == proto {
-			typeSl = py.TypeSl
+	// get http sock4 sock5 proxies from type proxies
+	proxies, ok := typProxies[proto]
+	if !ok {
+		return proxy, fmt.Errorf("proxy protocol [%s] cant found any proxy in [%s] map", proto, typ)
+	}
+	// get proxy from proxy slice
+	for _, elem := range proxies {
+		if elem.Name == name {
+			proxy = elem
 		}
 	}
-	// check if exist
-	if typeSl == nil {
-		return Proxy{}, errors.New("proto dont found in proxy member")
+	// check if find proxy, if equal with empty one, means proxy cant found in map
+	if reflect.DeepEqual(proxy, Proxy{}) {
+		return proxy, fmt.Errorf("proxy name [%s] cant found any proxy in slice [%s] map[%s]", name, proto, typ)
 	}
-	// find rule
-	return typeSl[0], nil
+	// proxy found
+	return proxy, nil
 }

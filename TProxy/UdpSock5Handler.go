@@ -4,10 +4,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/DeepinProxy/Com"
-	"github.com/DeepinProxy/Config"
 	"io"
 	"net"
+
+	"github.com/DeepinProxy/Com"
+	"github.com/DeepinProxy/Config"
 )
 
 type UdpSock5Handler struct {

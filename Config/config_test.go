@@ -6,8 +6,10 @@ import (
 )
 
 func TestProxyConfig_LoadPxyCfg(t *testing.T) {
+
+
 	cfg := &ProxyConfig{
-		Member: map[string]ProxyForm{
+		AllProxies: map[string]map[string][]Proxy{
 			"global": ProxyForm{
 				ProxyType{
 					Type: "http",
@@ -61,6 +63,7 @@ func TestProxyConfig_LoadPxyCfg(t *testing.T) {
 				},
 			},
 		},
+		TPort: 8080,
 	}
 
 	err := cfg.WritePxyCfg("~/Desktop/ProxyNew.yaml")

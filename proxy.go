@@ -1,37 +1,30 @@
 package main
 
 import (
-	cfg "github.com/DeepinProxy/Config"
 	tProxy "github.com/DeepinProxy/TProxy"
+	"pkg.deepin.io/lib/dbusutil"
 	"pkg.deepin.io/lib/log"
 )
 
 var logger = log.NewLogger("daemon/proxy")
-var mgr *tProxy.HandlerMgr
+var handlerMgr *tProxy.HandlerMgr
 
-// proxy main
 func main() {
 
-	//var udp bool = true
-	//var lsp string = ":8080"
-	var proto string = "sock5"
-	logger.SetLogLevel(log.LevelDebug)
-
-	mgr = tProxy.NewHandlerMsg()
-
-	// get config
-	config := cfg.NewProxyCfg()
-	err := config.LoadPxyCfg("/home/aris/Desktop/Proxy.yaml")
+	// system service
+	service, err := dbusutil.NewSystemService()
 	if err != nil {
-		logger.Warningf("load config failed, err: %v", err)
-		return
+		logger.Fatalf("create system service failed, err: %v", err)
 	}
-
-	proxy, err := config.GetProxy("global", proto)
+	// create proxy manager object
+	proxyManager := NewProxyManager()
+	err = service.Export(DBusPath, proxyManager)
 	if err != nil {
-		logger.Warningf("get proxy from config failed, err: %v", err)
-		return
+		logger.Fatalf("export DBus path failed, err: %v", err)
 	}
-
-	NewTcpProxy(":8080", tProxy.SOCK5TCP, proxy)
+	err = service.RequestName(DBusServiceName)
+	if err != nil {
+		logger.Fatalf("request DBus name failed, err: %v", err)
+	}
+	service.Wait()
 }

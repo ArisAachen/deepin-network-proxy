@@ -1,6 +1,7 @@
 package TProxy
 
 import (
+	"fmt"
 	"net"
 	"sync"
 
@@ -29,36 +30,85 @@ type BaseHandler interface {
 	Communicate()
 }
 
-type ProxyScope int
+type ProxyScope string
 
 const (
-	NoneProxy ProxyScope = iota
-	GlobalProxy
-	AppProxy
+	NoneProxy   ProxyScope = "no-proxy"
+	GlobalProxy ProxyScope = "global"
+	AppProxy    ProxyScope = "app"
 )
 
-func (scope ProxyScope) String() string {
+func BuildScope(scope string) (ProxyScope, error) {
 	switch scope {
-	case NoneProxy:
-		return "no-proxy"
-	case GlobalProxy:
-		return "global-proxy"
-	case AppProxy:
-		return "app-proxy"
+	case "no-proxy":
+		return NoneProxy, nil
+	case "global":
+		return GlobalProxy, nil
+	case "app":
+		return AppProxy, nil
 	default:
-		return "scope-type error"
+		return NoneProxy, fmt.Errorf("scope is invalid, scope: %v", scope)
 	}
 }
 
-type ProxyTyp string
+// scope
+func (Scope ProxyScope) String() string {
+	switch Scope {
+	case NoneProxy:
+		return "no-proxy"
+	case GlobalProxy:
+		return "global"
+	case AppProxy:
+		return "app"
+	default:
+		return "unknown-proxy"
+	}
+}
+
+// proto
+type ProtoTyp string
 
 const (
-	NoneTyp  ProxyTyp = "no-proxy"
-	HTTP     ProxyTyp = "http"
-	SOCK4    ProxyTyp = "sock4"
-	SOCK5TCP ProxyTyp = "sock5-tcp"
-	SOCK5UDP ProxyTyp = "sock5-udp"
+	NoneProto ProtoTyp = "no-proto"
+	HTTP      ProtoTyp = "http"
+	SOCK4     ProtoTyp = "sock4"
+	SOCK5TCP  ProtoTyp = "sock5-tcp"
+	SOCK5UDP  ProtoTyp = "sock5-udp"
 )
+
+func BuildProto(proto string) (ProtoTyp, error) {
+	switch proto {
+	case "no-proxy":
+		return NoneProto, nil
+	case "http":
+		return HTTP, nil
+	case "sock4":
+		return SOCK4, nil
+	case "sock5-tcp":
+		return SOCK5TCP, nil
+	case "sock5-udp":
+		return SOCK5UDP, nil
+	default:
+		return NoneProto, fmt.Errorf("scope is invalid, scope: %v", proto)
+	}
+}
+
+func (Typ ProtoTyp) String() string {
+	switch Typ {
+	case NoneProto:
+		return "no-proxy"
+	case HTTP:
+		return "http"
+	case SOCK4:
+		return "sock4"
+	case SOCK5TCP:
+		return "sock5-tcp"
+	case SOCK5UDP:
+		return "sock5-udp"
+	default:
+		return "unknown-proto"
+	}
+}
 
 // proxy server
 type proxyServer struct {
@@ -92,7 +142,7 @@ func NewHandlerMsg() *HandlerMgr {
 }
 
 // add handler to mgr
-func (mgr *HandlerMgr) AddHandler(typ ProxyTyp, scope ProxyScope, key HandlerKey, base BaseHandler) {
+func (mgr *HandlerMgr) AddHandler(scope ProxyScope, typ ProtoTyp, key HandlerKey, base BaseHandler) {
 	// check proto
 	switch scope {
 	case GlobalProxy, AppProxy:
@@ -114,14 +164,14 @@ func (mgr *HandlerMgr) AddHandler(typ ProxyTyp, scope ProxyScope, key HandlerKey
 	_, ok := baseMap[key]
 	if ok {
 		// if exist already, should ignore
-		logger.Debugf("[%s] key has already in map, type: %v, key: %v", scope.String(), typ, key)
+		logger.Debugf("[%s] key has already in map, type: %v, key: %v", scope, typ, key)
 		return
 		//preBase.Close()
 		//delete(baseMap, key)
 	}
 	// add handler
 	baseMap[key] = base
-	logger.Debugf("[%s] handler add to manager success, type: %v, key: %v", scope.String(), typ, key)
+	logger.Debugf("[%s] handler add to manager success, type: %v, key: %v", scope, typ, key)
 }
 
 // close and remove base handler
@@ -130,22 +180,22 @@ func (mgr *HandlerMgr) CloseBaseHandler(scope ProxyScope, key HandlerKey) {
 	defer mgr.handlerLock.Unlock()
 	baseMap, ok := mgr.handlerMap[scope]
 	if !ok {
-		logger.Debugf("[%s] delete base map dont exist in map", scope.String())
+		logger.Debugf("[%s] delete base map dont exist in map", scope)
 		return
 	}
 	base, ok := baseMap[key]
 	if !ok {
-		logger.Debugf("[%s] delete key dont exist in base map, key: %v", scope.String(), key)
+		logger.Debugf("[%s] delete key dont exist in base map, key: %v", scope, key)
 		return
 	}
 	// close and delete
 	base.Close()
 	delete(baseMap, key)
-	logger.Debugf("[%s] delete key successfully, key: %v", scope.String(), key)
+	logger.Debugf("[%s] delete key successfully, key: %v", scope, key)
 }
 
 // close handler according to proto
-func (mgr *HandlerMgr) CloseProtoHandler(scope ProxyScope) {
+func (mgr *HandlerMgr) CloseScopeHandler(scope ProxyScope) {
 	mgr.handlerLock.Lock()
 	defer mgr.handlerLock.Unlock()
 	baseMap, ok := mgr.handlerMap[scope]
@@ -165,11 +215,11 @@ func (mgr *HandlerMgr) CloseAll() {
 	mgr.handlerLock.Lock()
 	defer mgr.handlerLock.Unlock()
 	for proto, _ := range mgr.handlerMap {
-		mgr.CloseProtoHandler(proto)
+		mgr.CloseScopeHandler(proto)
 	}
 }
 
-func NewHandler(proto ProxyTyp, scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) BaseHandler {
+func NewHandler(proto ProtoTyp, scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) BaseHandler {
 	// search proto
 	switch proto {
 	case HTTP:

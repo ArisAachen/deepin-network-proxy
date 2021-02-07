@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/DeepinProxy/Config"
@@ -13,7 +14,7 @@ import (
 // handler private, data of handler
 
 type handlerPrv struct {
-	typ ProxyTyp
+	typ ProtoTyp
 
 	// config message
 	scope ProxyScope
@@ -31,12 +32,12 @@ type handlerPrv struct {
 	mgr    *HandlerMgr
 
 	// delete mark, in case if delete twice, not use this time
-	//deleted bool
-	//lock    sync.Mutex
+	deleted bool
+	lock    sync.Mutex
 }
 
 // new handler private
-func createHandlerPrv(typ ProxyTyp, scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) handlerPrv {
+func createHandlerPrv(typ ProtoTyp, scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) handlerPrv {
 	return handlerPrv{
 		// proxy typ
 		typ: typ,
@@ -52,7 +53,7 @@ func createHandlerPrv(typ ProxyTyp, scope ProxyScope, key HandlerKey, proxy Conf
 		lConn: lConn,
 
 		// delete mark
-		// deleted: false,
+		deleted: false,
 	}
 }
 
@@ -70,7 +71,7 @@ func (pr *handlerPrv) AddMgr(mgr *HandlerMgr) {
 	// add private manager
 	pr.mgr = mgr
 	// add parent to manager
-	mgr.AddHandler(pr.typ, pr.scope, pr.key, pr.parent)
+	mgr.AddHandler(pr.scope, pr.typ, pr.key, pr.parent)
 }
 
 // tcp connect to remote server
@@ -147,6 +148,12 @@ func (pr *handlerPrv) Communicate() {
 		if err != nil {
 			logger.Debugf("[%s] stop copy data, local [%s] -x- remote [%s], reason: %v", pr.typ, pr.lAddr.String(), pr.rAddr.String(), err)
 		}
+		// mark deleted, but not actually deleted at this time, only set a mark
+		if pr.isDeleted() {
+			return
+		}
+		pr.setDeleted(true)
+		// remove handler from map
 		pr.Remove()
 	}()
 	go func() {
@@ -155,24 +162,30 @@ func (pr *handlerPrv) Communicate() {
 		if err != nil {
 			logger.Debugf("[%s] stop copy data, local [%s] -x- remote [%s], reason: %v", pr.typ, pr.rAddr.String(), pr.lAddr.String(), err)
 		}
+		// mark deleted, but not actually deleted at this time, only set a mark
+		if pr.isDeleted() {
+			return
+		}
+		pr.setDeleted(true)
+		// remove handler from map
 		pr.Remove()
 	}()
 }
 
-//// mark deleted, not used this time
-//func (pr *handlerPrv) setDeleted(deleted bool) {
-//	pr.lock.Lock()
-//	defer pr.lock.Unlock()
-//	pr.deleted = deleted
-//}
-//
-//// mark deleted
-//func (pr *handlerPrv) isDeleted() bool {
-//	pr.lock.Lock()
-//	defer pr.lock.Unlock()
-//	deleted := pr.deleted
-//	return deleted
-//}
+// mark deleted, not used this time
+func (pr *handlerPrv) setDeleted(deleted bool) {
+	pr.lock.Lock()
+	defer pr.lock.Unlock()
+	pr.deleted = deleted
+}
+
+// mark deleted
+func (pr *handlerPrv) isDeleted() bool {
+	pr.lock.Lock()
+	defer pr.lock.Unlock()
+	deleted := pr.deleted
+	return deleted
+}
 
 // close handler
 func (pr *handlerPrv) Close() {
