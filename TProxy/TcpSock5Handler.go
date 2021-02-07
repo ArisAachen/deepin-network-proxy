@@ -16,17 +16,7 @@ type TcpSock5Handler struct {
 func NewTcpSock5Handler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *TcpSock5Handler {
 	// create new handler
 	handler := &TcpSock5Handler{
-		handlerPrv: handlerPrv{
-			// config
-			scope: scope,
-			key:   key,
-			proxy: proxy,
-
-			// connection
-			lAddr: lAddr,
-			rAddr: rAddr,
-			lConn: lConn,
-		},
+		handlerPrv: createHandlerPrv(SOCK5TCP, scope, key, proxy, lAddr, rAddr, lConn),
 	}
 	// add self to private parent
 	handler.saveParent(handler)
@@ -38,13 +28,13 @@ func (handler *TcpSock5Handler) Tunnel() error {
 	// dial proxy server
 	rConn, err := handler.dialProxy()
 	if err != nil {
-		logger.Warningf("[sock5] failed to dial proxy server, err: %v", err)
+		logger.Warningf("[%s] failed to dial proxy server, err: %v", handler.typ, err)
 		return err
 	}
 	// check type
 	tcpAddr, ok := handler.rAddr.(*net.TCPAddr)
 	if !ok {
-		logger.Warning("[sock5] tunnel addr type is not tcp")
+		logger.Warningf("[%s] tunnel addr type is not tcp", handler.typ)
 		return errors.New("type is not udp")
 	}
 	// auth message
@@ -73,7 +63,7 @@ func (handler *TcpSock5Handler) Tunnel() error {
 	// sock5 hand shake
 	_, err = rConn.Write(buf)
 	if err != nil {
-		logger.Warningf("[sock5] hand shake request failed, err: %v", err)
+		logger.Warningf("[%s] hand shake request failed, err: %v", handler.typ, err)
 		return err
 	}
 	/*
@@ -86,15 +76,16 @@ func (handler *TcpSock5Handler) Tunnel() error {
 	*/
 	_, err = rConn.Read(buf)
 	if err != nil {
-		logger.Warningf("[sock5] hand shake response failed, err: %v", err)
+		logger.Warningf("[%s] hand shake response failed, err: %v", handler.typ, err)
 		return err
 	}
-	logger.Debugf("[sock5] hand shake response success message auth method: %v", buf[1])
+	logger.Debugf("[%s] hand shake response success message auth method: %v", handler.typ, buf[1])
 	if buf[0] != 5 || (buf[1] != 0 && buf[1] != 2) {
 		return fmt.Errorf("sock5 proto is invalid, sock type: %v, method: %v", buf[0], buf[1])
 	}
 	// check if server need auth
 	if buf[1] == 2 {
+		logger.Debugf("[%s] proxy need auth, start authenticating...", handler.typ)
 		/*
 		    sock5 auth request
 		  +----+------+----------+------+----------+
@@ -112,21 +103,21 @@ func (handler *TcpSock5Handler) Tunnel() error {
 		// write auth message to writer
 		_, err = rConn.Write(buf)
 		if err != nil {
-			logger.Warningf("[sock5] auth request failed, err: %v", err)
+			logger.Warningf("[%s] auth request failed, err: %v", handler.typ, err)
 			return err
 		}
 		buf = make([]byte, 32)
 		_, err = rConn.Read(buf)
 		if err != nil {
-			logger.Warningf("[sock5] auth response failed, err: %v", err)
+			logger.Warningf("[%s] auth response failed, err: %v", handler.typ, err)
 			return err
 		}
 		// RFC1929 user/pass auth should return 1, but some sock5 return 5
 		if buf[0] != 5 && buf[0] != 1 {
-			logger.Warningf("[sock5] auth response incorrect code, code: %v", buf[0])
+			logger.Warningf("[%s] auth response incorrect code, code: %v", handler.typ, buf[0])
 			return fmt.Errorf("incorrect sock5 auth response, code: %v", buf[0])
 		}
-		logger.Debugf("[sock5] auth success, code: %v", buf[0])
+		logger.Debugf("[%s] auth success, code: %v", handler.typ, buf[0])
 	}
 	/*
 			sock5 connect request
@@ -157,30 +148,30 @@ func (handler *TcpSock5Handler) Tunnel() error {
 	if portU == 0 {
 		portU = 80
 	}
-	var port []byte
+	port := make([]byte, 2)
 	binary.BigEndian.PutUint16(port, portU)
 	buf = append(buf, port...)
 	// request proxy connect rConn server
-	logger.Debugf("[sock5] send connect request, buf: %v", buf)
+	logger.Debugf("[%s] send connect request, buf: %v", handler.typ, buf)
 	_, err = rConn.Write(buf)
 	if err != nil {
-		logger.Warningf("[sock5] send connect request failed, err: %v", err)
+		logger.Warningf("[%s] send connect request failed, err: %v", handler.typ, err)
 		return err
 	}
-	logger.Debugf("[sock5] request successfully")
+	logger.Debugf("[%s] request successfully", handler.typ)
 	buf = make([]byte, 16)
 	_, err = rConn.Read(buf)
 	if err != nil {
-		logger.Warningf("[sock5] connect response failed, err: %v", err)
+		logger.Warningf("[%s] connect response failed, err: %v", handler.typ, err)
 		return err
 	}
-	logger.Debugf("[sock5] response successfully, buf: %v", buf)
+	logger.Debugf("[%s] response successfully, buf: %v", handler.typ, buf)
 	if buf[0] != 5 || buf[1] != 0 {
-		logger.Warningf("[sock5] connect response failed, version: %v, code: %v", buf[0], buf[1])
+		logger.Warningf("[%s] connect response failed, version: %v, code: %v", handler.typ, buf[0], buf[1])
 		return fmt.Errorf("incorrect sock5 connect reponse, version: %v, code: %v", buf[0], buf[1])
 	}
-	logger.Debugf("[sock5] proxy: tunnel create success, [%s] -> [%s] -> [%s]",
-		handler.lAddr.String(), rConn.RemoteAddr(), handler.rAddr.String())
+	logger.Debugf("[%s] proxy: tunnel create success, [%s] -> [%s] -> [%s]",
+		handler.typ, handler.lAddr.String(), rConn.RemoteAddr(), handler.rAddr.String())
 	// save rConn handler
 	handler.rConn = rConn
 	return nil

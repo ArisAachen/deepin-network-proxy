@@ -4,10 +4,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"net"
-
 	"github.com/DeepinProxy/Com"
 	"github.com/DeepinProxy/Config"
+	"io"
+	"net"
 )
 
 type UdpSock5Handler struct {
@@ -18,17 +18,7 @@ type UdpSock5Handler struct {
 func NewUdpSock5Handler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *UdpSock5Handler {
 	// create new handler
 	handler := &UdpSock5Handler{
-		handlerPrv: handlerPrv{
-			// config
-			scope: scope,
-			key:   key,
-			proxy: proxy,
-
-			// connection
-			lAddr: lAddr,
-			rAddr: rAddr,
-			lConn: lConn,
-		},
+		handlerPrv: createHandlerPrv(SOCK5UDP, scope, key, proxy, lAddr, rAddr, lConn),
 	}
 	// add self to private parent
 	handler.saveParent(handler)
@@ -43,50 +33,61 @@ func (handler *UdpSock5Handler) Close() {
 	handler.handlerPrv.Close()
 }
 
+// rewrite read remote
+func (handler *UdpSock5Handler) Read(buf []byte) (int, error) {
+	// check if rConn is nil
+	if handler.rConn == nil {
+		return 0, errors.New("remote handler is nil")
+	}
+	data := make([]byte, 512)
+	n, err := handler.rConn.Read(data)
+	if err != nil {
+		logger.Warningf("read remote failed, err: %v", err)
+		return n, err
+	}
+	pkgData := Com.UnMarshalPackage(data)
+	copy(buf, pkgData.Data)
+	return n, nil
+}
+
+// rewrite write remote
+func (handler *UdpSock5Handler) Write(buf []byte) (int, error) {
+	if handler.rConn == nil {
+		return 0, errors.New("remote handler is nil")
+	}
+	pkgData := Com.DataPackage{
+		Addr: handler.rAddr,
+		Data: buf,
+	}
+	_, err := handler.rConn.Write(Com.MarshalPackage(pkgData, "udp"))
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+}
+
 // rewrite communication
 func (handler *UdpSock5Handler) Communicate() {
 	// local -> remote
 	go func() {
-		defer handler.Close()
-		for {
-			logger.Debugf("begin copy data, local [%s] -> remote [%s]", handler.lAddr.String(), handler.rAddr.String())
-			// read local data
-			buf := make([]byte, 512)
-			err := handler.ReadLocal(buf)
-			if err != nil {
-				logger.Debugf("read local data failed, err: %v", err)
-				return
-			}
-			// write remote data
-			pkgData := Com.MarshalPackage(Com.DataPackage{Addr: handler.rAddr, Data: buf}, "udp")
-			err = handler.WriteRemote(pkgData)
-			if err != nil {
-				logger.Debugf("write remote data failed, err: %v", err)
-				return
-			}
+		logger.Debugf("[%s] begin copy data, local [%s] -> remote [%s]", handler.typ, handler.lAddr.String(), handler.rAddr.String())
+		_, err := io.Copy(handler.lConn, handler)
+		if err != nil {
+			logger.Debugf("[%s] stop copy data, local [%s] -x- remote [%s], reason: %v",
+				handler.typ, handler.lAddr.String(), handler.rAddr.String(), err)
 		}
+		handler.Remove()
 	}()
 
 	// remote -> local
 	go func() {
-		defer handler.Close()
-		for {
-			logger.Debugf("begin copy data, remote [%s] -> local [%s]", handler.rAddr.String(), handler.lAddr.String())
-			// read local data
-			buf := make([]byte, 512)
-			err := handler.ReadRemote(buf)
-			if err != nil {
-				logger.Debugf("read remote data failed, err: %v", err)
-				return
-			}
-			// write remote data
-			pkgData := Com.UnMarshalPackage(buf)
-			err = handler.WriteLocal(pkgData.Data)
-			if err != nil {
-				logger.Debugf("write remote data failed, err: %v", err)
-				return
-			}
+		logger.Debugf("[%s] begin copy data, remote [%s] -> local [%s]", handler.typ, handler.lAddr.String(), handler.rAddr.String())
+		_, err := io.Copy(handler, handler.lConn)
+		if err != nil {
+			logger.Debugf("[%s] stop copy data, remote [%s] -x- local [%s], reason: %v",
+				handler.typ, handler.lAddr.String(), handler.rAddr.String(), err)
 		}
+		handler.Remove()
 	}()
 }
 
@@ -98,6 +99,7 @@ func (handler *UdpSock5Handler) Tunnel() error {
 		logger.Warningf("[udp] failed to dial proxy server, err: %v", err)
 		return err
 	}
+	// save tcp connection
 	handler.rTcpConn = rTcpConn
 	// check type
 	udpAddr, ok := handler.rAddr.(*net.UDPAddr)

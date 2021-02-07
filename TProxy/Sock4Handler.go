@@ -17,17 +17,7 @@ type Sock4Handler struct {
 func NewSock4Handler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *Sock4Handler {
 	// create new handler
 	handler := &Sock4Handler{
-		handlerPrv: handlerPrv{
-			// config
-			scope: scope,
-			key:   key,
-			proxy: proxy,
-
-			// connection
-			lAddr: lAddr,
-			rAddr: rAddr,
-			lConn: lConn,
-		},
+		handlerPrv: createHandlerPrv(SOCK4, scope, key, proxy, lAddr, rAddr, lConn),
 	}
 	// add self to private parent
 	handler.saveParent(handler)

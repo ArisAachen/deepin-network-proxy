@@ -90,6 +90,10 @@ func SetSockOptTrn(fd int) error {
 	if err = syscall.SetsockoptInt(fd, syscall.SOL_IP, syscall.IP_TRANSPARENT, 1); err != nil {
 		return err
 	}
+	// set ip recv_origin_dst
+	if err = syscall.SetsockoptInt(fd, syscall.SOL_IP, syscall.IP_RECVORIGDSTADDR, 1); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -140,7 +144,11 @@ func MegaDial(network string, lAddr net.Addr, rAddr net.Addr) (net.Conn, error) 
 	}
 	// get domain
 	var domain int
-	var ip net.IP = reflect.ValueOf(lAddr).FieldByName("IP").Bytes()
+	// net.addr is pointer, cannot get field by name directly
+	addrPtr := reflect.ValueOf(lAddr)
+	addrValue := reflect.Indirect(addrPtr)
+	// get ip message
+	var ip net.IP = addrValue.FieldByName("IP").Bytes()
 	if ip.To4() != nil {
 		domain = syscall.AF_INET
 	} else if ip.To16() != nil {
@@ -197,12 +205,13 @@ func MegaDial(network string, lAddr net.Addr, rAddr net.Addr) (net.Conn, error) 
 // convert addr to sock addr
 func convertAddrToSockAddr(addr net.Addr) (syscall.Sockaddr, error) {
 	// check if addr can convert to udp addr and tcp addr, if not return as error
-	if !reflect.TypeOf(addr).ConvertibleTo(reflect.TypeOf(net.UDPAddr{})) &&
-		!reflect.TypeOf(addr).ConvertibleTo(reflect.TypeOf(net.TCPAddr{})) {
+	if !reflect.TypeOf(addr).ConvertibleTo(reflect.TypeOf(&net.UDPAddr{})) &&
+		!reflect.TypeOf(addr).ConvertibleTo(reflect.TypeOf(&net.TCPAddr{})) {
 		return nil, errors.New("addr typ is not tcp addr or udp addr")
 	}
 	// convert net addr to sock_addr
-	value := reflect.ValueOf(addr)
+	valuePtr := reflect.ValueOf(addr)
+	value := reflect.Indirect(valuePtr)
 	var ip net.IP = value.FieldByName("IP").Bytes()
 	port := value.FieldByName("Port").Int()
 	if port == 0 {
@@ -242,8 +251,10 @@ func MarshalPackage(pkg DataPackage, proto string) []byte {
 	*/
 	// message
 	addr := pkg.Addr
-	var ip net.IP = reflect.ValueOf(addr).FieldByName("IP").Bytes()
-	port16 := reflect.ValueOf(addr).FieldByName("Port").Uint()
+	valuePtr := reflect.ValueOf(addr)
+	value := reflect.Indirect(valuePtr)
+	var ip net.IP = value.FieldByName("IP").Bytes()
+	netPort := value.FieldByName("Port").Int()
 	data := pkg.Data
 	// udp message protocol
 	buf := make([]byte, 4)
@@ -272,7 +283,7 @@ func MarshalPackage(pkg DataPackage, proto string) []byte {
 	// convert port 2 byte
 
 	port := make([]byte, 2)
-	binary.BigEndian.PutUint16(port, uint16(port16))
+	binary.BigEndian.PutUint16(port, uint16(netPort))
 	buf = append(buf, port...)
 	// add data
 	buf = append(buf, data...)

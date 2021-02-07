@@ -13,6 +13,8 @@ import (
 // handler private, data of handler
 
 type handlerPrv struct {
+	typ ProxyTyp
+
 	// config message
 	scope ProxyScope
 	proxy Config.Proxy
@@ -27,16 +29,30 @@ type handlerPrv struct {
 	parent BaseHandler
 	key    HandlerKey
 	mgr    *HandlerMgr
+
+	// delete mark, in case if delete twice, not use this time
+	//deleted bool
+	//lock    sync.Mutex
 }
 
 // new handler private
-func newHandlerPrv(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr) *handlerPrv {
-	return &handlerPrv{
+func createHandlerPrv(typ ProxyTyp, scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) handlerPrv {
+	return handlerPrv{
+		// proxy typ
+		typ: typ,
+
+		// config
 		scope: scope,
-		lAddr: lAddr,
-		rAddr: rAddr,
 		key:   key,
 		proxy: proxy,
+
+		// connection
+		lAddr: lAddr,
+		rAddr: rAddr,
+		lConn: lConn,
+
+		// delete mark
+		// deleted: false,
 	}
 }
 
@@ -54,7 +70,7 @@ func (pr *handlerPrv) AddMgr(mgr *HandlerMgr) {
 	// add private manager
 	pr.mgr = mgr
 	// add parent to manager
-	mgr.AddHandler(pr.scope, pr.key, pr.parent)
+	mgr.AddHandler(pr.typ, pr.scope, pr.key, pr.parent)
 }
 
 // tcp connect to remote server
@@ -66,10 +82,10 @@ func (pr *handlerPrv) dialProxy() (net.Conn, error) {
 	server := proxy.Server + ":" + strconv.Itoa(proxy.Port)
 	conn, err := net.DialTimeout("tcp", server, 3*time.Second)
 	if err != nil {
-		logger.Warningf("dial proxy server failed, err: %v", err)
+		logger.Warningf("[%s] dial proxy server failed, err: %v", pr.typ, err)
 		return nil, err
 	}
-	logger.Debugf("dial proxy server success, [%s] -> [%s]", conn.LocalAddr(), conn.RemoteAddr())
+	logger.Debugf("[%s] dial proxy server success, local [%s] -> remote [%s]", pr.typ, conn.LocalAddr(), conn.RemoteAddr())
 	return conn, nil
 }
 
@@ -126,22 +142,37 @@ func (pr *handlerPrv) ReadLocal(buf []byte) error {
 // communicate lConn and rConn
 func (pr *handlerPrv) Communicate() {
 	go func() {
-		logger.Debugf("begin copy data, local [%s] -> remote [%s]", pr.lAddr.String(), pr.rAddr.String())
+		logger.Debugf("[%s] begin copy data, local [%s] -> remote [%s]", pr.typ, pr.lAddr.String(), pr.rAddr.String())
 		_, err := io.Copy(pr.lConn, pr.rConn)
 		if err != nil {
-			logger.Debugf("stop copy data, local [%s] =x= remote [%s], reason: %v", pr.lAddr.String(), pr.rAddr.String(), err)
+			logger.Debugf("[%s] stop copy data, local [%s] -x- remote [%s], reason: %v", pr.typ, pr.lAddr.String(), pr.rAddr.String(), err)
 		}
 		pr.Remove()
 	}()
 	go func() {
-		logger.Debugf("begin copy data, remote [%s] -> local [%s]", pr.rAddr.String(), pr.lAddr.String())
+		logger.Debugf("[%s] begin copy data, remote [%s] -> local [%s]", pr.typ, pr.rAddr.String(), pr.lAddr.String())
 		_, err := io.Copy(pr.rConn, pr.lConn)
 		if err != nil {
-			logger.Debugf("stop copy data, remote [%s] =x= local [%s], reason: %v", pr.rAddr.String(), pr.lAddr.String(), err)
+			logger.Debugf("[%s] stop copy data, local [%s] -x- remote [%s], reason: %v", pr.typ, pr.rAddr.String(), pr.lAddr.String(), err)
 		}
 		pr.Remove()
 	}()
 }
+
+//// mark deleted, not used this time
+//func (pr *handlerPrv) setDeleted(deleted bool) {
+//	pr.lock.Lock()
+//	defer pr.lock.Unlock()
+//	pr.deleted = deleted
+//}
+//
+//// mark deleted
+//func (pr *handlerPrv) isDeleted() bool {
+//	pr.lock.Lock()
+//	defer pr.lock.Unlock()
+//	deleted := pr.deleted
+//	return deleted
+//}
 
 // close handler
 func (pr *handlerPrv) Close() {
@@ -151,6 +182,7 @@ func (pr *handlerPrv) Close() {
 	if pr.rConn != nil {
 		_ = pr.rConn.Close()
 	}
+	logger.Debugf("[%s] proxy has successfully closed, local [%s] -> remote [%s]", pr.typ, pr.lAddr.String(), pr.rAddr.String())
 }
 
 // close and delete handler from manager
