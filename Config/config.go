@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 
+	"github.com/DeepinProxy/Com"
 	"gopkg.in/yaml.v2"
 )
 
@@ -132,6 +133,11 @@ func (p *ProxyConfig) WritePxyCfg(path string) error {
 		return err
 	}
 	path, err = filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	// guarantee file dir is exist
+	err = Com.GuaranteeDir(filepath.Dir(path))
 	if err != nil {
 		return err
 	}

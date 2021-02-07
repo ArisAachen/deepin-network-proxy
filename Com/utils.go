@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/user"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -18,7 +16,7 @@ import (
 const (
 	SoOriginalDst    = 80
 	Ip6SoOriginalDst = 80 // from linux/include/uapi/linux/netfilter_ipv6/ip6_tables.h
-	ConfigPath       = ".config/deepin_proxy"
+	ConfigPath       = ".config/deepin_proxy/proxy.yaml"
 )
 
 // get origin destination addr
@@ -311,14 +309,22 @@ func UnMarshalPackage(msg []byte) DataPackage {
 
 // get home dir
 func GetUserConfigDir() (string, error) {
-	// get effective user id
-	uid := os.Geteuid()
 	// search user message
-	userMsg, err := user.Lookup(strconv.Itoa(uid))
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	// get home dir from user message
-	home := userMsg.HomeDir
 	return filepath.Join(home, ConfigPath), nil
+}
+
+// make sure dir exist
+func GuaranteeDir(path string) error {
+	base := filepath.Dir(path)
+	if _, err := os.Stat(base); os.IsNotExist(err) {
+		err = os.MkdirAll(base, os.ModePerm)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -27,8 +27,9 @@ type ProxyManager struct {
 
 	// signal
 	signals *struct {
-		Enabled bool
-		Proxy   config.Proxy
+		Proxy struct {
+			proxy config.Proxy
+		}
 	}
 
 	// handler manager
