@@ -2,7 +2,9 @@ package main
 
 import (
 	"errors"
+	"github.com/godbus/dbus"
 	"os"
+	"pkg.deepin.io/lib/dbusutil"
 	"sync"
 
 	com "github.com/DeepinProxy/Com"
@@ -24,6 +26,14 @@ type ProxyManager struct {
 
 	// if proxy opened
 	Enabled bool
+
+	// methods
+	methods *struct {
+		ClearProxies func()
+		SetProxies   func() `in:"proxies"`
+		StartProxy   func() `in:"scope,lsp,proto,name,udp" out:"err"`
+		StopProxy    func() `in:"scope"`
+	}
 
 	// signal
 	signals *struct {
@@ -80,39 +90,48 @@ func (mgr *ProxyManager) GetInterfaceName() string {
 }
 
 // clear all proxies
-func (mgr *ProxyManager) ClearProxies() {
+func (mgr *ProxyManager) ClearProxies() *dbus.Error {
 	mgr.Proxies = config.ProxyConfig{}
 	mgr.writeConfig()
+	return nil
 }
 
 // reset all proxy
-func (mgr *ProxyManager) SetProxies(proxies config.ProxyConfig) {
+func (mgr *ProxyManager) SetProxies(proxies config.ProxyConfig) *dbus.Error {
+	// mark if need update config
+	var update bool
 	// if proxies include globalSignal proxy, stop and reset globalSignal proxy
 	if global, ok := proxies.AllProxies[tProxy.GlobalProxy.String()]; ok {
 		logger.Debugf("change global proxy config, proxies: %v", proxies)
 		mgr.StopProxy(tProxy.GlobalProxy.String())
 		mgr.Proxies.AllProxies[tProxy.GlobalProxy.String()] = global
+		update = true
 	}
 	// if proxies include appSignal proxy, stop and reset appSignal proxy
 	if app, ok := proxies.AllProxies[tProxy.AppProxy.String()]; ok {
 		logger.Debugf("change appSignal proxy config, proxies: %v", proxies)
 		mgr.StopProxy(tProxy.AppProxy.String())
 		mgr.Proxies.AllProxies[tProxy.AppProxy.String()] = app
+		update = true
 	}
 	// write config
-	mgr.writeConfig()
+	if update {
+		mgr.writeConfig()
+	}
+	// never failed
+	return nil
 }
 
 // start proxy   [globalSignal,appSignal] -> [http,sock4,sock5] -> [http_one] -> false
-func (mgr *ProxyManager) StartProxy(scope string, lsp string, proto string, name string, udp bool) error {
+func (mgr *ProxyManager) StartProxy(scope string, lsp string, proto string, name string, udp bool) *dbus.Error {
 	proxy, err := mgr.Proxies.GetProxy(scope, proto, name)
 	if err != nil {
 		logger.Warningf("search proxy failed, err: %v", err)
-		return err
+		return dbusutil.ToError(err)
 	}
 
 	// start proxy
-	return mgr.startProxy(scope, lsp, proto, proxy, udp)
+	return dbusutil.ToError(mgr.startProxy(scope, lsp, proto, proxy, udp))
 }
 
 func (mgr *ProxyManager) startProxy(scope string, lsp string, proto string, proxy config.Proxy, udp bool) error {
@@ -155,7 +174,7 @@ func (mgr *ProxyManager) startProxy(scope string, lsp string, proto string, prox
 }
 
 // stop proxy according to proxy type
-func (mgr *ProxyManager) StopProxy(scope string) {
+func (mgr *ProxyManager) StopProxy(scope string) *dbus.Error {
 	switch scope {
 	case tProxy.GlobalProxy.String():
 		// stop global proxy
@@ -170,4 +189,5 @@ func (mgr *ProxyManager) StopProxy(scope string) {
 	default:
 		logger.Warningf("stop proxy error, proxy type not exist, type: %v", scope)
 	}
+	return nil
 }

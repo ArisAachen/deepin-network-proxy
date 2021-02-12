@@ -4,19 +4,26 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"reflect"
+	"strconv"
+	"strings"
 	"syscall"
 
+	"github.com/godbus/dbus"
+	polkit "github.com/linuxdeepin/go-dbus-factory/org.freedesktop.policykit1"
 	"golang.org/x/sys/unix"
 )
 
 const (
 	SoOriginalDst    = 80
 	Ip6SoOriginalDst = 80 // from linux/include/uapi/linux/netfilter_ipv6/ip6_tables.h
-	ConfigPath       = ".config/deepin_proxy/proxy.yaml"
+	ConfigPath       = ".config/deepin-proxy/proxy.yaml"
+	ProxyActionId    = "com.deepin.system.proxy"
 )
 
 // get origin destination addr
@@ -309,11 +316,13 @@ func UnMarshalPackage(msg []byte) DataPackage {
 
 // get home dir
 func GetUserConfigDir() (string, error) {
-	// search user message
-	home, err := os.UserHomeDir()
+	// get current user
+	curUser, err := user.Current()
 	if err != nil {
 		return "", err
 	}
+	// get home dir
+	home := curUser.HomeDir
 	return filepath.Join(home, ConfigPath), nil
 }
 
@@ -327,4 +336,59 @@ func GuaranteeDir(path string) error {
 		}
 	}
 	return nil
+}
+
+func PromotePrivilege(actionId string, uid uint32, pid uint32, time uint64) error {
+	// get system bus
+	systemBus, err := dbus.SystemBus()
+	if err != nil {
+		return err
+	}
+	// auth body
+	authority := polkit.NewAuthority(systemBus)
+	// add uid pid and start-time to polkit request
+	subject := polkit.MakeSubject(polkit.SubjectKindUnixProcess)
+	subject.SetDetail("uid", pid)
+	subject.SetDetail("pid", pid)
+	subject.SetDetail("start-time", time)
+	// start auth to promote privilege
+	ret, err := authority.CheckAuthorization(0, subject, actionId, nil, polkit.CheckAuthorizationFlagsNone, "")
+	if err != nil {
+		return err
+	}
+	// check if return success
+	if !ret.IsAuthorized {
+		return errors.New("authorized failed")
+	}
+	// auth success
+	return nil
+}
+
+// get start time from /proc/pid/stat
+func GetProcStartTime(pid uint32) (uint64, error) {
+	// proc path
+	procPath := fmt.Sprintf("/proc/%v/stat", pid)
+	if _, err := os.Stat(procPath); err != nil {
+		return 0, errors.New("proc not exist")
+	}
+	// read stat message
+	stat, err := ioutil.ReadFile(procPath)
+	if err != nil {
+		return 0, err
+	}
+	// split all message
+	// https://man7.org/linux/man-pages/man5/procfs.5.html
+	statSl := strings.Split(string(stat), " ")
+	// actually len is 52, according to doc, but 22 is enough here
+	if len(statSl) < 22 {
+		return 0, errors.New("proc split is not larger than 22")
+	}
+	// index 21 is the start time
+	timeStr := statSl[21]
+	// convert to int
+	time, err := strconv.Atoi(timeStr)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(time), nil
 }
