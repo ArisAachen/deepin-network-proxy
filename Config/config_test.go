@@ -85,19 +85,24 @@ func TestProxyConfig_LoadPxyCfg(t *testing.T) {
 	}
 
 	cfg := &ProxyConfig{
-		AllProxies: map[string]map[string][]Proxy{
-			"global": {
-				"http":  http,
-				"sock4": sock4,
-				"sock5": sock5,
+		AllProxies: map[string]ScopeProxies{
+			"global": ScopeProxies{
+				Proxies: map[string][]Proxy{
+					"http":  http,
+					"sock4": sock4,
+					"sock5": sock5,
+				},
+				TPort: 8080,
 			},
 			"app": {
-				"http":  http,
-				"sock4": sock4,
-				"sock5": sock5,
+				Proxies: map[string][]Proxy{
+					"http":  http,
+					"sock4": sock4,
+					"sock5": sock5,
+				},
+				TPort: 8090,
 			},
 		},
-		TPort: 8080,
 	}
 
 	path, err := Com.GetUserConfigDir()

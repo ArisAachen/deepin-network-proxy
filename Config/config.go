@@ -3,13 +3,11 @@ package Config
 import (
 	"errors"
 	"fmt"
+	"github.com/DeepinProxy/Com"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"reflect"
-
-	"github.com/DeepinProxy/Com"
-	"gopkg.in/yaml.v2"
 )
 
 // proxy type, support HTTP SOCK4 SOCK5
@@ -111,16 +109,63 @@ type Proxy struct {
 	WhiteList []string `yaml:"whitelist"` // white site dont use proxy, not use this time
 }
 
+// scope proxy
+type ScopeProxies struct {
+	Proxies map[string][]Proxy `yaml:"proxies"` // map[http,sock4,sock5][]proxy
+	TPort   int                `yaml:"t-port"`
+}
+
+func (p *ScopeProxies) GetProxy(proto string, name string) (*Proxy, error) {
+	if p == nil {
+		return nil, errors.New("proxy proxies is nil")
+	}
+	// get proxies
+	proxies, ok := p.Proxies[proto]
+	if !ok {
+		return nil, fmt.Errorf("proxy proto [%s] not exist in proxies", proto)
+	}
+	// search name
+	for _, proxy := range proxies {
+		if proxy.Name == name {
+			return &proxy, nil
+		}
+	}
+	return nil, fmt.Errorf("proxy name [%s] not exist in proto [%s]", name, proto)
+}
+
+// set and add proxy
+func (p *ScopeProxies) SetProxy(proto string, name string, proxy Proxy) {
+	if p == nil {
+		return
+	}
+	// get proxies
+	proxies, ok := p.Proxies[proto]
+	if !ok {
+		return
+	}
+	var exist bool
+	// search name and replace
+	for index, old := range proxies {
+		if old.Name == name {
+			proxies[index] = proxy
+			exist = true
+		}
+	}
+	// if not exist, append
+	if !exist {
+		proxies = append(proxies, proxy)
+	}
+}
+
 // proxy config
 type ProxyConfig struct {
-	AllProxies map[string]map[string][]Proxy `yaml:"all-proxy"` // map[global,app]map[http,sock4,sock5][]proxy
-	TPort      int                           `yaml:"t-port"`
+	AllProxies map[string]ScopeProxies `yaml:"all-proxies"` // map[global,app]ScopeProxies
 }
 
 // create new
 func NewProxyCfg() *ProxyConfig {
 	cfg := &ProxyConfig{
-		AllProxies: make(map[string]map[string][]Proxy),
+		AllProxies: make(map[string]ScopeProxies),
 	}
 	return cfg
 }
@@ -172,28 +217,39 @@ func (p *ProxyConfig) LoadPxyCfg(path string) error {
 	return nil
 }
 
-// get proxy from config map, index: [global,app] -> [http,sock4,sock5] -> [proxy-name]
-func (p *ProxyConfig) GetProxy(typ string, proto string, name string) (Proxy, error) {
-	var proxy Proxy
-	// get global or app proxies from all proxies
-	typProxies, ok := p.AllProxies[typ]
+// get proxy by scope
+func (p *ProxyConfig) GetScopeProxies(scope string) (ScopeProxies, error) {
+	// check if all proxies is nil
+	if p.AllProxies == nil {
+		return ScopeProxies{}, errors.New("all proxy config is nil")
+	}
+	proxies, ok := p.AllProxies[scope]
 	if !ok {
-		return proxy, fmt.Errorf("proxy type [%s] cant found any proxy in all proxies map", typ)
+		return ScopeProxies{}, fmt.Errorf("proxy scope [%s] cant found any proxy in all proxies map", scope)
+	}
+	return proxies, nil
+}
+
+func (p *ProxyConfig) SetScopeProxies(scope string, proxies ScopeProxies) {
+	// check if all proxies is nil
+	if p.AllProxies == nil {
+		return
+	}
+	// set proxies
+	p.AllProxies[scope] = proxies
+}
+
+// get proxy from config map, index: [global,app] -> [http,sock4,sock5] -> [proxy-name]
+func (p *ProxyConfig) GetProxy(scope string, proto string, name string) (*Proxy, error) {
+	// get global or app proxies from all proxies
+	scopeProxy, ok := p.AllProxies[scope]
+	if !ok {
+		return nil, fmt.Errorf("proxy type [%s] cant found any proxy in all proxies map", scope)
 	}
 	// get http sock4 sock5 proxies from type proxies
-	proxies, ok := typProxies[proto]
-	if !ok {
-		return proxy, fmt.Errorf("proxy protocol [%s] cant found any proxy in [%s] map", proto, typ)
-	}
-	// get proxy from proxy slice
-	for _, elem := range proxies {
-		if elem.Name == name {
-			proxy = elem
-		}
-	}
-	// check if find proxy, if equal with empty one, means proxy cant found in map
-	if reflect.DeepEqual(proxy, Proxy{}) {
-		return proxy, fmt.Errorf("proxy name [%s] cant found any proxy in slice [%s] map[%s]", name, proto, typ)
+	proxy, err := scopeProxy.GetProxy(proto, name)
+	if err != nil {
+		return nil, fmt.Errorf("proxy protocol [%s] cant found any proxy in [%s] map", proto, scope)
 	}
 	// proxy found
 	return proxy, nil

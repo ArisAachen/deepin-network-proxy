@@ -132,73 +132,71 @@ type HandlerKey struct {
 // manager all handler
 type HandlerMgr struct {
 	handlerLock sync.RWMutex
-	handlerMap  map[ProxyScope]map[HandlerKey]BaseHandler // handlerMap sync.Map
+	handlerMap  map[ProtoTyp]map[HandlerKey]BaseHandler // handlerMap sync.Map map[http udp]map[HandlerKey]BaseHandler
+
+	// scope [global,app]
+	scope string
+	// chan to stop accept
+	stop chan bool
 }
 
-func NewHandlerMsg() *HandlerMgr {
+func NewHandlerMsg(scope string) *HandlerMgr {
 	return &HandlerMgr{
-		handlerMap: make(map[ProxyScope]map[HandlerKey]BaseHandler),
+		scope:      scope,
+		handlerMap: make(map[ProtoTyp]map[HandlerKey]BaseHandler),
+		stop:       make(chan bool),
 	}
 }
 
 // add handler to mgr
-func (mgr *HandlerMgr) AddHandler(scope ProxyScope, typ ProtoTyp, key HandlerKey, base BaseHandler) {
-	// check proto
-	switch scope {
-	case GlobalProxy, AppProxy:
-	default:
-		logger.Warningf("add handler proto not exist, proto: %v", scope)
-		return
-	}
+func (mgr *HandlerMgr) AddHandler(typ ProtoTyp, key HandlerKey, base BaseHandler) {
 	// add lock
 	mgr.handlerLock.Lock()
 	defer mgr.handlerLock.Unlock()
-	// get base map
-	baseMap := mgr.handlerMap[scope]
-	// if not exist, create one
-	if baseMap == nil {
-		baseMap = make(map[HandlerKey]BaseHandler)
-		mgr.handlerMap[scope] = baseMap
-	}
 	// check if handler already exist
-	_, ok := baseMap[key]
+	baseMap, ok := mgr.handlerMap[typ]
+	if !ok {
+		baseMap = make(map[HandlerKey]BaseHandler)
+		mgr.handlerMap[typ] = baseMap
+	}
+	_, ok = baseMap[key]
 	if ok {
 		// if exist already, should ignore
-		logger.Debugf("[%s] key has already in map, type: %v, key: %v", scope, typ, key)
+		logger.Debugf("[%s] key has already in map, type: %v, key: %v", mgr.scope, typ, key)
 		return
 		//preBase.Close()
 		//delete(baseMap, key)
 	}
 	// add handler
 	baseMap[key] = base
-	logger.Debugf("[%s] handler add to manager success, type: %v, key: %v", scope, typ, key)
+	logger.Debugf("[%s] handler add to manager success, type: %v, key: %v", mgr.scope, typ, key)
 }
 
 // close and remove base handler
-func (mgr *HandlerMgr) CloseBaseHandler(scope ProxyScope, key HandlerKey) {
+func (mgr *HandlerMgr) CloseBaseHandler(typ ProtoTyp, key HandlerKey) {
 	mgr.handlerLock.Lock()
 	defer mgr.handlerLock.Unlock()
-	baseMap, ok := mgr.handlerMap[scope]
+	baseMap, ok := mgr.handlerMap[typ]
 	if !ok {
-		logger.Debugf("[%s] delete base map dont exist in map", scope)
+		logger.Debugf("[%s] delete base map dont exist in map", mgr.scope)
 		return
 	}
 	base, ok := baseMap[key]
 	if !ok {
-		logger.Debugf("[%s] delete key dont exist in base map, key: %v", scope, key)
+		logger.Debugf("[%s] delete key dont exist in base map, key: %v", mgr.scope, key)
 		return
 	}
 	// close and delete
 	base.Close()
 	delete(baseMap, key)
-	logger.Debugf("[%s] delete key successfully, key: %v", scope, key)
+	logger.Debugf("[%s] delete key successfully, key: %v", mgr.scope, key)
 }
 
 // close handler according to proto
-func (mgr *HandlerMgr) CloseScopeHandler(scope ProxyScope) {
+func (mgr *HandlerMgr) CloseTypHandler(typ ProtoTyp) {
 	mgr.handlerLock.Lock()
 	defer mgr.handlerLock.Unlock()
-	baseMap, ok := mgr.handlerMap[scope]
+	baseMap, ok := mgr.handlerMap[typ]
 	if !ok {
 		return
 	}
@@ -207,7 +205,7 @@ func (mgr *HandlerMgr) CloseScopeHandler(scope ProxyScope) {
 		base.Close()
 	}
 	// delete proto handler
-	delete(mgr.handlerMap, scope)
+	delete(mgr.handlerMap, typ)
 }
 
 // close all handler
@@ -215,7 +213,7 @@ func (mgr *HandlerMgr) CloseAll() {
 	mgr.handlerLock.Lock()
 	defer mgr.handlerLock.Unlock()
 	for proto, _ := range mgr.handlerMap {
-		mgr.CloseScopeHandler(proto)
+		mgr.CloseTypHandler(proto)
 	}
 }
 

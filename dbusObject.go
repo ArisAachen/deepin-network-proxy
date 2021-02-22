@@ -122,6 +122,7 @@ func (mgr *ProxyManager) SetProxies(proxies config.ProxyConfig) *dbus.Error {
 	return nil
 }
 
+
 // start proxy   [globalSignal,appSignal] -> [http,sock4,sock5] -> [http_one] -> false
 func (mgr *ProxyManager) StartProxy(scope string, lsp string, proto string, name string, udp bool) *dbus.Error {
 	proxy, err := mgr.Proxies.GetProxy(scope, proto, name)

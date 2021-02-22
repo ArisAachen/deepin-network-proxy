@@ -71,7 +71,7 @@ func (pr *handlerPrv) AddMgr(mgr *HandlerMgr) {
 	// add private manager
 	pr.mgr = mgr
 	// add parent to manager
-	mgr.AddHandler(pr.scope, pr.typ, pr.key, pr.parent)
+	mgr.AddHandler(pr.typ, pr.key, pr.parent)
 }
 
 // tcp connect to remote server
@@ -200,5 +200,5 @@ func (pr *handlerPrv) Close() {
 
 // close and delete handler from manager
 func (pr *handlerPrv) Remove() {
-	pr.mgr.CloseBaseHandler(pr.scope, pr.key)
+	pr.mgr.CloseBaseHandler(pr.typ, pr.key)
 }
