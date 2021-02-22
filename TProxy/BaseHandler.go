@@ -131,7 +131,7 @@ type HandlerKey struct {
 
 // manager all handler
 type HandlerMgr struct {
-	handlerLock sync.RWMutex
+	handlerLock sync.Mutex
 	handlerMap  map[ProtoTyp]map[HandlerKey]BaseHandler // handlerMap sync.Map map[http udp]map[HandlerKey]BaseHandler
 
 	// scope [global,app]

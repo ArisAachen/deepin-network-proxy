@@ -17,9 +17,6 @@ func TestProxyConfig_LoadPxyCfg(t *testing.T) {
 			Port:           808,
 			UserName:       "uos",
 			Password:       "12345678",
-			ProxyProgram:   []string{"apt", "ssr"},
-			NoProxyProgram: []string{"apt", "ssr"},
-			WhiteList:      []string{"baidu.com", "si.com"},
 		},
 		{
 			ProtoType:      "http",
@@ -28,9 +25,6 @@ func TestProxyConfig_LoadPxyCfg(t *testing.T) {
 			Port:           80,
 			UserName:       "uos",
 			Password:       "12345678",
-			ProxyProgram:   []string{"apt", "ssr"},
-			NoProxyProgram: []string{"apt", "ssr"},
-			WhiteList:      []string{"baidu.com", "si.com"},
 		},
 	}
 	sock4 := []Proxy{
@@ -42,9 +36,6 @@ func TestProxyConfig_LoadPxyCfg(t *testing.T) {
 			Port:           1080,
 			UserName:       "uos",
 			Password:       "12345678",
-			ProxyProgram:   []string{"apt", "ssr"},
-			NoProxyProgram: []string{"apt", "ssr"},
-			WhiteList:      []string{"baidu.com", "si.com"},
 		},
 		{
 			ProtoType:      "sock4",
@@ -53,34 +44,25 @@ func TestProxyConfig_LoadPxyCfg(t *testing.T) {
 			Port:           1080,
 			UserName:       "uos",
 			Password:       "12345678",
-			ProxyProgram:   []string{"apt", "ssr"},
-			NoProxyProgram: []string{"apt", "ssr"},
-			WhiteList:      []string{"baidu.com", "si.com"},
 		},
 	}
 	sock5 := []Proxy{
 		// http proxy
 		{
-			ProtoType:      "sock5",
-			Name:           "sock5_1",
-			Server:         "10.20.31.132",
-			Port:           1080,
-			UserName:       "uos",
-			Password:       "12345678",
-			ProxyProgram:   []string{"apt", "ssr"},
-			NoProxyProgram: []string{"apt", "ssr"},
-			WhiteList:      []string{"baidu.com", "si.com"},
+			ProtoType: "sock5",
+			Name:      "sock5_1",
+			Server:    "10.20.31.132",
+			Port:      1080,
+			UserName:  "uos",
+			Password:  "12345678",
 		},
 		{
-			ProtoType:      "sock5",
-			Name:           "sock5_2",
-			Server:         "10.20.31.132",
-			Port:           1080,
-			UserName:       "uos",
-			Password:       "12345678",
-			ProxyProgram:   []string{"apt", "ssr"},
-			NoProxyProgram: []string{"apt", "ssr"},
-			WhiteList:      []string{"baidu.com", "si.com"},
+			ProtoType: "sock5",
+			Name:      "sock5_2",
+			Server:    "10.20.31.132",
+			Port:      1080,
+			UserName:  "uos",
+			Password:  "12345678",
 		},
 	}
 
@@ -92,7 +74,10 @@ func TestProxyConfig_LoadPxyCfg(t *testing.T) {
 					"sock4": sock4,
 					"sock5": sock5,
 				},
-				TPort: 8080,
+				TPort:          8080,
+				ProxyProgram:   []string{"apt", "ssr"},
+				NoProxyProgram: []string{"apt", "ssr"},
+				WhiteList:      []string{"baidu.com", "si.com"},
 			},
 			"app": {
 				Proxies: map[string][]Proxy{
@@ -100,7 +85,10 @@ func TestProxyConfig_LoadPxyCfg(t *testing.T) {
 					"sock4": sock4,
 					"sock5": sock5,
 				},
-				TPort: 8090,
+				TPort:          8090,
+				ProxyProgram:   []string{"apt", "ssr"},
+				NoProxyProgram: []string{"apt", "ssr"},
+				WhiteList:      []string{"baidu.com", "si.com"},
 			},
 		},
 	}

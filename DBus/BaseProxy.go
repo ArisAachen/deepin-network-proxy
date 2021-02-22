@@ -1,108 +1,85 @@
 package DBus
 
 import (
-	"os"
-	"pkg.deepin.io/lib/dbusutil"
-	"sync"
-
-	com "github.com/DeepinProxy/Com"
+	"errors"
 	config "github.com/DeepinProxy/Config"
+	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
+	"pkg.deepin.io/lib/dbusutil"
 	"pkg.deepin.io/lib/log"
 )
 
-var logger *log.Logger
+// https://www.kernel.org/doc/Documentation/networking/tproxy.txt
 
-// use to init proxy once
-var allProxy *config.ProxyConfig
-var once sync.Once
+type BaseProxy interface {
+	// DBus method
+	StartProxy(proto string, name string, udp bool) *dbus.Error
+	StopProxy()
+	SetProxies(proxies config.ScopeProxies) *dbus.Error
+	ClearProxies() *dbus.Error
 
-type baseProxy struct {
-	// proxy message
-	Proxies config.ScopeProxies
-	Proxy   config.Proxy // current proxy
+	// mark
+	getScope() tProxy.ProxyScope
+	getDBusPath() dbus.ObjectPath
 
-	// if proxy opened
-	Enabled bool
-
-	// methods
-	methods *struct {
-		ClearProxies func()
-		SetProxies   func() `in:"proxies"`
-		StartProxy   func() `in:"proto,name,udp" out:"err"`
-		StopProxy    func() `in:"scope"`
-	}
-
-	// signal
-	signals *struct {
-		Proxy struct {
-			proxy config.Proxy
-		}
-	}
+	// export DBus service
+	export(service *dbusutil.Service) error
 }
 
-// load config from user home dir
-func (mgr *baseProxy) loadConfig() {
-	// get effective user config dir
-	path, err := com.GetUserConfigDir()
+func CreateProxyService() error {
+	// get session bus
+	service, err := dbusutil.NewSessionService()
 	if err != nil {
-		logger.Warningf("failed to get user home dir, user:%v, err: %v", os.Geteuid(), err)
-		return
+		logger.Warningf("get session bus failed, err: %v", err)
+		return err
 	}
 
-	// init proxy once
-	once.Do(func() {
-		// load proxy
-		allProxy = config.NewProxyCfg()
-		err = allProxy.LoadPxyCfg(path)
-		if err != nil {
-			logger.Warningf("load config failed, path: %s, err: %v", path, err)
-			return
-		}
-	})
-	// get proxies from config
-	mgr.Proxies, err = allProxy.GetScopeProxies(mgr.getScope())
-	if err != nil {
-		logger.Warningf("[%s] get proxies from global proxies failed, err: %v", mgr.getScope(), err)
-		return
+	// export global proxy
+	global := newProxy(tProxy.GlobalProxy)
+	if global == nil {
+		logger.Warning("global proxy init failed")
+		return errors.New("global proxy init failed")
 	}
-}
-
-// write config
-func (mgr *baseProxy) writeConfig() {
-	// get config path
-	path, err := com.GetUserConfigDir()
+	err = global.export(service)
 	if err != nil {
-		logger.Warningf("[%s] get user home dir failed, user:%v, err: %v", mgr.getScope(), os.Geteuid(), err)
-		return
-	}
-	// check if all proxy is legal
-	if allProxy == nil {
-		return
-	}
-	// set and write config
-	allProxy.SetScopeProxies(mgr.getScope(), mgr.Proxies)
-	err = allProxy.WritePxyCfg(path)
-	if err != nil {
-		logger.Warningf("[%s] write config file failed, err: %v", mgr.getScope(), err)
-		return
-	}
-}
-
-// global and app rewrite this method to diff
-func (mgr *baseProxy) getScope() string {
-	return "base"
-}
-
-func (mgr *baseProxy) StartProxy(proto string, name string, udp bool) *dbus.Error {
-	// get proxies
-	proxy, err := mgr.Proxies.GetProxy(proto, name)
-	if err != nil {
-		logger.Warningf("[%s] get proxy failed, err: %v", mgr.getScope(), err)
-		return dbusutil.ToError(err)
+		return err
 	}
 
+	// export app proxy
+	app := newProxy(tProxy.AppProxy)
+	if app == nil {
+		logger.Warning("app proxy init failed")
+		return errors.New("app proxy init failed")
+	}
+	err = app.export(service)
+	if err != nil {
+		return err
+	}
+
+	// request name
+	err = service.RequestName(BusServiceName)
+	if err != nil {
+		logger.Warningf("request service failed, err: %v", err)
+		return err
+	}
+
+	logger.Debug("success export DBus service")
+
+	service.Wait()
 	return nil
+}
+
+// new proxy according to scope
+func newProxy(scope tProxy.ProxyScope) BaseProxy {
+	switch scope {
+	case tProxy.GlobalProxy:
+		return NewGlobalProxy()
+	case tProxy.AppProxy:
+		return NewAppProxy()
+	default:
+		logger.Warningf("init unknown scope type")
+		return nil
+	}
 }
 
 func init() {

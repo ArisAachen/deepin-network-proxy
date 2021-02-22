@@ -100,37 +100,36 @@ type Proxy struct {
 	// auth message
 	UserName string `yaml:"username"`
 	Password string `yaml:"password"`
+}
 
+// scope proxy
+type ScopeProxies struct {
+	Proxies map[string][]Proxy `yaml:"proxies"` // map[http,sock4,sock5][]proxy
 	// proxy setting
 	ProxyProgram   []string `yaml:"proxy-program"`    // global proxy will ignore
 	NoProxyProgram []string `yaml:"no-proxy-program"` // app proxy will ignore
 
 	// white list
 	WhiteList []string `yaml:"whitelist"` // white site dont use proxy, not use this time
+	TPort     int      `yaml:"t-port"`
 }
 
-// scope proxy
-type ScopeProxies struct {
-	Proxies map[string][]Proxy `yaml:"proxies"` // map[http,sock4,sock5][]proxy
-	TPort   int                `yaml:"t-port"`
-}
-
-func (p *ScopeProxies) GetProxy(proto string, name string) (*Proxy, error) {
+func (p *ScopeProxies) GetProxy(proto string, name string) (Proxy, error) {
 	if p == nil {
-		return nil, errors.New("proxy proxies is nil")
+		return Proxy{}, errors.New("proxy proxies is nil")
 	}
 	// get proxies
 	proxies, ok := p.Proxies[proto]
 	if !ok {
-		return nil, fmt.Errorf("proxy proto [%s] not exist in proxies", proto)
+		return Proxy{}, fmt.Errorf("proxy proto [%s] not exist in proxies", proto)
 	}
 	// search name
 	for _, proxy := range proxies {
 		if proxy.Name == name {
-			return &proxy, nil
+			return proxy, nil
 		}
 	}
-	return nil, fmt.Errorf("proxy name [%s] not exist in proto [%s]", name, proto)
+	return Proxy{}, fmt.Errorf("proxy name [%s] not exist in proto [%s]", name, proto)
 }
 
 // set and add proxy
@@ -240,16 +239,16 @@ func (p *ProxyConfig) SetScopeProxies(scope string, proxies ScopeProxies) {
 }
 
 // get proxy from config map, index: [global,app] -> [http,sock4,sock5] -> [proxy-name]
-func (p *ProxyConfig) GetProxy(scope string, proto string, name string) (*Proxy, error) {
+func (p *ProxyConfig) GetProxy(scope string, proto string, name string) (Proxy, error) {
 	// get global or app proxies from all proxies
 	scopeProxy, ok := p.AllProxies[scope]
 	if !ok {
-		return nil, fmt.Errorf("proxy type [%s] cant found any proxy in all proxies map", scope)
+		return Proxy{}, fmt.Errorf("proxy type [%s] cant found any proxy in all proxies map", scope)
 	}
 	// get http sock4 sock5 proxies from type proxies
 	proxy, err := scopeProxy.GetProxy(proto, name)
 	if err != nil {
-		return nil, fmt.Errorf("proxy protocol [%s] cant found any proxy in [%s] map", proto, scope)
+		return Proxy{}, fmt.Errorf("proxy protocol [%s] cant found any proxy in [%s] map", proto, scope)
 	}
 	// proxy found
 	return proxy, nil
