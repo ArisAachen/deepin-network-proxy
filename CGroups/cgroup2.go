@@ -43,6 +43,12 @@ type cgroupMessage struct {
 	procs []string // /usr/sbin/NetworkManager
 }
 
+func newGrpMsg() *cgroupMessage {
+	return &cgroupMessage{
+		procs: []string{},
+	}
+}
+
 // get cgroup procs path  as /sys/fs/cgroup/unified/main-proc.slice/cgroup.procs
 func (p *cgroupMessage) getProcsPath() string {
 	path := filepath.Join(p.getProcsDir(), procs)
@@ -62,10 +68,16 @@ func (p *cgroupMessage) addProcs(exePaths []string) {
 
 // add module exec path
 func (p *cgroupMessage) addProc(exePath string) {
+	// check if len is nil
+	if len(p.procs) == 0 {
+		p.procs = append(p.procs, exePath)
+		return
+	}
 	// check if already exist
 	index := sort.SearchStrings(p.procs, exePath)
 	if index == len(p.procs) {
-		p.procs[index] = exePath
+		// p.procs[index] = exePath
+		p.procs = append(p.procs, exePath)
 		logger.Debugf("Proc [%s] added success in cgroupMessage [%s]", exePath, p.path)
 		return
 	}
@@ -135,6 +147,7 @@ func (c *CGroupManager) CreateCGroup(level int, elemPath string) error {
 	cgpMsg := cgroupMessage{
 		path:     elemPath,
 		priority: level,
+		procs:    []string{},
 	}
 	// add to manager
 	c.CGroups = append(c.CGroups, cgpMsg)

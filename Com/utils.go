@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -391,4 +392,11 @@ func GetProcStartTime(pid uint32) (uint64, error) {
 		return 0, err
 	}
 	return uint64(time), nil
+}
+
+
+// pid must be num
+var pidRegexp = regexp.MustCompile("^[0-9]*[1-9][0-9]*$")
+func IsPid(pid string) bool {
+	return pidRegexp.MatchString(pid)
 }

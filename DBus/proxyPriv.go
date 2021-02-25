@@ -26,8 +26,8 @@ var allCGroups *cgroup.CGroupManager
 var onceCgp sync.Once
 
 const (
-	BusServiceName = "com.deepin.system.proxy"
-	BusPath        = "/com/deepin/system/proxy"
+	BusServiceName = "com.deepin.session.proxy"
+	BusPath        = "/com/deepin/session/proxy"
 	BusInterface   = BusServiceName
 )
 
