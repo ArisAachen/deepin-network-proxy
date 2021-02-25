@@ -19,8 +19,11 @@ type BaseProxy interface {
 	ClearProxies() *dbus.Error
 
 	// mark
-	getScope() tProxy.ProxyScope
+	// getScope() tProxy.ProxyScope
 	getDBusPath() dbus.ObjectPath
+
+	// init cgroup v2
+	initCGroup() error
 
 	// export DBus service
 	export(service *dbusutil.Service) error

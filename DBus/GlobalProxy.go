@@ -2,6 +2,7 @@ package DBus
 
 import (
 	"fmt"
+
 	config "github.com/DeepinProxy/Config"
 	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
@@ -22,8 +23,8 @@ type GlobalProxy struct {
 		StopProxy    func()
 
 		// diff method
-		IgnoreProxy   func() `in:"app" out:"err"`
-		UnIgnoreProxy func() `in:"app" out:"err"`
+		IgnoreProxyApps   func() `in:"app" out:"err"`
+		UnIgnoreProxyApps func() `in:"app" out:"err"`
 	}
 
 	// signal
@@ -39,19 +40,35 @@ func NewGlobalProxy() *GlobalProxy {
 		proxyPrv: initProxyPrv(tProxy.GlobalProxy),
 	}
 	global.loadConfig()
+	_ = global.initCGroup()
 	return global
 }
 
 func (mgr *GlobalProxy) export(service *dbusutil.Service) error {
 	if service == nil {
-		logger.Warningf("[%s] export service is nil", mgr.getScope())
-		return fmt.Errorf("[%s] export service is nil", mgr.getScope())
+		logger.Warningf("[%s] export service is nil", mgr.scope.String())
+		return fmt.Errorf("[%s] export service is nil", mgr.scope.String())
 	}
 	err := service.Export(mgr.getDBusPath(), mgr)
 	if err != nil {
-		logger.Warningf("[%s] export service failed, err: %v", mgr.getScope(), err)
+		logger.Warningf("[%s] export service failed, err: %v", mgr.scope.String(), err)
 		return err
 	}
+	return nil
+}
+
+func (mgr *GlobalProxy) initCGroup() error {
+	// will not error in any case
+	err := mgr.proxyPrv.initCGroup()
+	if err != nil {
+		return err
+	}
+	// make dir
+	err = allCGroups.CreateCGroup(3, mgr.scope.String())
+	if err != nil {
+		return err
+	}
+	logger.Debugf("[%s] create cgroup success", mgr.scope.String())
 	return nil
 }
 
@@ -67,11 +84,13 @@ func (mgr *GlobalProxy) getDBusPath() dbus.ObjectPath {
 }
 
 // add proxy app
-func (mgr *GlobalProxy) IgnoreProxy(app []string) *dbus.Error {
+func (mgr *GlobalProxy) IgnoreProxyApps(apps []string) *dbus.Error {
+	mgr.proxyPrv.addCGroupProcs(mgr.scope.String(), apps)
 	return nil
 }
 
 // delete proxy app
-func (mgr *GlobalProxy) UnIgnoreProxy(app []string) *dbus.Error {
+func (mgr *GlobalProxy) UnIgnoreProxyApps(apps []string) *dbus.Error {
+	mgr.proxyPrv.delCGroupProcs(mgr.scope.String(), apps)
 	return nil
 }

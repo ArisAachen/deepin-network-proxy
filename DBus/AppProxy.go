@@ -19,8 +19,8 @@ type AppProxy struct {
 		StopProxy    func()
 
 		// diff method
-		AddProxy func() `in:"app" out:"err"`
-		DelProxy func() `in:"app" out:"err"`
+		AddProxyApps func() `in:"app" out:"err"`
+		DelProxyApps func() `in:"app" out:"err"`
 	}
 
 	// signal
@@ -37,17 +37,18 @@ func NewAppProxy() *AppProxy {
 		proxyPrv: initProxyPrv(tProxy.AppProxy),
 	}
 	app.loadConfig()
+	_ = app.initCGroup()
 	return app
 }
 
 func (mgr *AppProxy) export(service *dbusutil.Service) error {
 	if service == nil {
-		logger.Warningf("[%s] export service is nil", mgr.getScope())
-		return fmt.Errorf("[%s] export service is nil", mgr.getScope())
+		logger.Warningf("[%s] export service is nil", mgr.scope)
+		return fmt.Errorf("[%s] export service is nil", mgr.scope)
 	}
 	err := service.Export(mgr.getDBusPath(), mgr)
 	if err != nil {
-		logger.Warningf("[%s] export service failed, err: %v", mgr.getScope(), err)
+		logger.Warningf("[%s] export service failed, err: %v", mgr.scope, err)
 		return err
 	}
 	return nil
@@ -64,12 +65,30 @@ func (mgr *AppProxy) getDBusPath() dbus.ObjectPath {
 	return dbus.ObjectPath(path)
 }
 
+// init cgroup
+func (mgr *AppProxy) initCGroup() error {
+	// will not error in any case
+	err := mgr.proxyPrv.initCGroup()
+	if err != nil {
+		return err
+	}
+	// make dir
+	err = allCGroups.CreateCGroup(2, mgr.scope.String())
+	if err != nil {
+		return err
+	}
+	logger.Debugf("[%s] create cgroup success", mgr.scope)
+	return nil
+}
+
 // add proxy app
-func (mgr *AppProxy) AddProxy(app []string) *dbus.Error {
+func (mgr *AppProxy) AddProxyApps(apps []string) *dbus.Error {
+	mgr.proxyPrv.addCGroupProcs(mgr.scope.String(), apps)
 	return nil
 }
 
 // delete proxy app
-func (mgr *AppProxy) DelProxy(app []string) *dbus.Error {
+func (mgr *AppProxy) DelProxyApps(apps []string) *dbus.Error {
+	mgr.proxyPrv.delCGroupProcs(mgr.scope.String(), apps)
 	return nil
 }

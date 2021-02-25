@@ -3,28 +3,39 @@ package DBus
 import (
 	"net"
 	"os"
-	"pkg.deepin.io/lib/dbusutil"
 	"strconv"
 	"sync"
 
+	cgroup "github.com/DeepinProxy/CGroups"
 	com "github.com/DeepinProxy/Com"
 	config "github.com/DeepinProxy/Config"
 	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
+	"pkg.deepin.io/lib/dbusutil"
 	"pkg.deepin.io/lib/log"
 )
 
 var logger *log.Logger
 
-// use to init proxy once
-var allProxy *config.ProxyConfig
-var once sync.Once
+// use to init proxy onceCfg
+var allProxyCfg *config.ProxyConfig
+var onceCfg sync.Once
+
+// use to int cgroup v2
+var allCGroups *cgroup.CGroupManager
+var onceCgp sync.Once
 
 const (
 	BusServiceName = "com.deepin.system.proxy"
 	BusPath        = "/com/deepin/system/proxy"
 	BusInterface   = BusServiceName
 )
+
+// must ignore proxy proc
+var mainProxy []string = []string{
+	"DeepinProxy",
+	"Qv2ray",
+}
 
 type proxyPrv struct {
 	scope tProxy.ProxyScope
@@ -65,11 +76,11 @@ func (mgr *proxyPrv) loadConfig() {
 		return
 	}
 
-	// init proxy once
-	once.Do(func() {
+	// init proxy onceCfg
+	onceCfg.Do(func() {
 		// load proxy
-		allProxy = config.NewProxyCfg()
-		err = allProxy.LoadPxyCfg(path)
+		allProxyCfg = config.NewProxyCfg()
+		err = allProxyCfg.LoadPxyCfg(path)
 		if err != nil {
 			logger.Warningf("load config failed, path: %s, err: %v", path, err)
 			return
@@ -77,7 +88,7 @@ func (mgr *proxyPrv) loadConfig() {
 	})
 
 	// get proxies
-	mgr.Proxies, err = allProxy.GetScopeProxies(mgr.scope.String())
+	mgr.Proxies, err = allProxyCfg.GetScopeProxies(mgr.scope.String())
 	if err != nil {
 		logger.Warningf("[%s] get proxies from global proxies failed, err: %v", mgr.scope, err)
 		return
@@ -94,17 +105,44 @@ func (mgr *proxyPrv) writeConfig() error {
 		return err
 	}
 	// check if all proxy is legal
-	if allProxy == nil {
+	if allProxyCfg == nil {
 		return err
 	}
 	// set and write config
-	allProxy.SetScopeProxies(mgr.scope.String(), mgr.Proxies)
-	err = allProxy.WritePxyCfg(path)
+	allProxyCfg.SetScopeProxies(mgr.scope.String(), mgr.Proxies)
+	err = allProxyCfg.WritePxyCfg(path)
 	if err != nil {
 		logger.Warningf("[%s] write config file failed, err: %v", mgr.scope, err)
 		return err
 	}
 	return nil
+}
+
+// init cgroup v2
+func (mgr *proxyPrv) initCGroup() error {
+	var err error
+	// init once
+	onceCgp.Do(func() {
+		// init
+		allCGroups = cgroup.NewCGroupManager()
+
+		// add default slice, with the highest priority
+		err = allCGroups.CreateCGroup(1, cgroup.MainGRP)
+
+		// add must ignore cgroup to level 1
+		mgr.addCGroupProcs(cgroup.MainGRP, mainProxy)
+	})
+	return err
+}
+
+// add cgroup proc
+func (mgr *proxyPrv) addCGroupProcs(elem string, procs []string) {
+	allCGroups.AddCGroupProcs(elem, procs)
+}
+
+// add cgroup proc
+func (mgr *proxyPrv) delCGroupProcs(elem string, procs []string) {
+	allCGroups.DelCGroupProcs(elem, procs)
 }
 
 // interface path
