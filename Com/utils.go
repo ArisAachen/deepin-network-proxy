@@ -394,9 +394,24 @@ func GetProcStartTime(pid uint32) (uint64, error) {
 	return uint64(time), nil
 }
 
+// use to mega del elem from slice and map
+func MegaDel(src interface{}, tgt interface{}) error {
+	// check kind, only map and slice support mega del
+	kind := reflect.TypeOf(src).Kind()
+	if kind != reflect.Slice && kind != reflect.Map {
+		return errors.New("source type is not slice or map")
+	}
+	//
+	if kind == reflect.Slice {
+
+	}
+
+	return nil
+}
 
 // pid must be num
 var pidRegexp = regexp.MustCompile("^[0-9]*[1-9][0-9]*$")
+
 func IsPid(pid string) bool {
 	return pidRegexp.MatchString(pid)
 }

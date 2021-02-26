@@ -21,9 +21,9 @@ var logger *log.Logger
 
 // proc message
 type ProcMessage struct {
-	execPath string
-	cwdPath  string
-	pid      string
+	execPath    string // exe path
+	cgroup2Path string // mark cgroup v2 path
+	pid         string // pid
 }
 
 // Manager all procs
@@ -216,7 +216,7 @@ func (p *ProcManager) listen() error {
 					logger.Debugf("pid [%s] dont include exec path", pid)
 					continue
 				}
-				logger.Debugf("proc exec, pid [%s] exe [%s]", pid, msg.execPath)
+				logger.Debugf("add proc exec, pid [%s] exe [%s]", pid, msg.execPath)
 				p.addProc(pid, msg)
 			}
 		// proc exit
@@ -233,13 +233,8 @@ func (p *ProcManager) listen() error {
 			// this result is not correct, but seldom program in this way
 			if event.ProcessPid == event.ProcessTgid {
 				pid := strconv.Itoa(int(event.ProcessPid))
-				msg, err := getProcMsg(pid)
-				if err != nil {
-					logger.Debugf("pid [%s] dont include exec path", pid)
-					continue
-				}
-				logger.Debugf("proc exec, pid [%s] exe [%s]", pid, msg.execPath)
-				p.addProc(pid, msg)
+				logger.Debugf("del proc exec, pid [%s]", pid)
+				p.delProc(pid)
 			}
 		default:
 			logger.Debugf("recv message is proc: %v", header.What)
@@ -293,6 +288,11 @@ func CreateProcsService() error {
 			err = manager.listen()
 		}
 	}()
+
+	err = manager.loadProc()
+	if err != nil {
+		logger.Warning(err)
+	}
 
 	// export bus path
 	err = service.Export(BusPath, manager)
