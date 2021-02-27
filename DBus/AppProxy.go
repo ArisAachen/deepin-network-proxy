@@ -35,12 +35,18 @@ type AppProxy struct {
 
 // create app proxy
 func NewAppProxy() *AppProxy {
-	app := &AppProxy{
+	appModule := &AppProxy{
 		proxyPrv: initProxyPrv(tProxy.AppProxy),
 	}
-	app.loadConfig()
-	_ = app.initCGroup()
-	return app
+	// load config
+	appModule.loadConfig()
+
+	// init cgroup
+	_ = appModule.initCGroup()
+	apps := appModule.Proxies.ProxyProgram
+	appModule.addCGroupExes(apps)
+
+	return appModule
 }
 
 func (mgr *AppProxy) export(service *dbusutil.Service) error {
@@ -90,12 +96,12 @@ func (mgr *AppProxy) initCGroup() error {
 
 // add proxy app
 func (mgr *AppProxy) AddProxyApps(apps []string) *dbus.Error {
-	mgr.proxyPrv.addCGroupProcs(mgr.scope.String(), apps)
+	mgr.proxyPrv.addCGroupExes(apps)
 	return nil
 }
 
 // delete proxy app
 func (mgr *AppProxy) DelProxyApps(apps []string) *dbus.Error {
-	mgr.proxyPrv.delCGroupProcs(mgr.scope.String(), apps)
+	mgr.proxyPrv.delCGroupExes(apps)
 	return nil
 }

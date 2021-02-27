@@ -4,9 +4,8 @@ import (
 	"os/exec"
 )
 
-func AddCGroup(path string, pid string) error {
-
-
+// use to attach pid to cgroup
+func AttachCGroup(path string, pid string) error {
 	cmd := exec.Command("echo", pid, ">", path)
 	buf, err := cmd.CombinedOutput()
 	if err != nil {
@@ -14,5 +13,9 @@ func AddCGroup(path string, pid string) error {
 		return err
 	}
 	logger.Debugf("result is %s", string(buf))
+	return nil
+}
+
+func ClassifyCGroup(cgroup string, path string) error {
 	return nil
 }

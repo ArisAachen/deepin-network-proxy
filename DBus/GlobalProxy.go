@@ -91,12 +91,12 @@ func (mgr *GlobalProxy) getDBusPath() dbus.ObjectPath {
 
 // add proxy app
 func (mgr *GlobalProxy) IgnoreProxyApps(apps []string) *dbus.Error {
-	mgr.proxyPrv.addCGroupProcs(mgr.scope.String(), apps)
+	mgr.proxyPrv.addCGroupExes(apps)
 	return nil
 }
 
 // delete proxy app
 func (mgr *GlobalProxy) UnIgnoreProxyApps(apps []string) *dbus.Error {
-	mgr.proxyPrv.delCGroupProcs(mgr.scope.String(), apps)
+	mgr.proxyPrv.delCGroupExes(apps)
 	return nil
 }

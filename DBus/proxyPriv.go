@@ -129,13 +129,13 @@ func (mgr *proxyPrv) initCGroup() error {
 		// init
 		allCGroups = cgroup.NewCGroupManager()
 		// add default slice, with the highest priority
-		_, err = allCGroups.CreateCGroup(cgroup.MainLevel, cgroup.MainGRP)
+		member, err := allCGroups.CreateCGroup(cgroup.MainLevel, cgroup.MainGRP)
 		if err != nil {
 			logger.Warningf("init main cgroup failed, err: %v", err)
 			return
 		}
 		// add must ignore cgroup to level 1
-		mgr.addCGroupProcs(cgroup.MainGRP, mainProxy)
+		member.AddTgtExes(mainProxy)
 		// startListen
 		err = allCGroups.Listen()
 		if err != nil {
@@ -147,13 +147,15 @@ func (mgr *proxyPrv) initCGroup() error {
 }
 
 // add cgroup proc
-func (mgr *proxyPrv) addCGroupProcs(elem string, procs []string) {
-	allCGroups.AddCGroupProcs(elem, procs)
+func (mgr *proxyPrv) addCGroupExes(exes []string) {
+	mgr.cgroupMember.AddTgtExes(exes)
+	//allCGroups.AddCGroupProcs(elem, procs)
 }
 
 // add cgroup proc
-func (mgr *proxyPrv) delCGroupProcs(elem string, procs []string) {
-	allCGroups.DelCGroupProcs(elem, procs)
+func (mgr *proxyPrv) delCGroupExes(exes []string) {
+	mgr.cgroupMember.DelTgtExes(exes, true)
+	//allCGroups.DelCGroupProcs(elem, procs)
 }
 
 // interface path

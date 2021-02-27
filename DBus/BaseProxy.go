@@ -26,8 +26,8 @@ type BaseProxy interface {
 
 	// cgroup v2
 	initCGroup() error
-	addCGroupProcs(elem string, procs []string)
-	delCGroupProcs(elem string, procs []string)
+	addCGroupExes(procs []string)
+	delCGroupExes(procs []string)
 
 	// export DBus service
 	export(service *dbusutil.Service) error

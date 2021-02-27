@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/godbus/dbus"
-	"path/filepath"
 	"pkg.deepin.io/lib/log"
-	"reflect"
 	"sort"
 	"sync"
 
@@ -18,240 +16,15 @@ var logger *log.Logger
 
 // cgroup v2 cgroup.tgtExeSl
 
-const (
-	// cgroup2 main path
-	cgroup2Path = "/sys/fs/cgroup/unified"
-
-	// cgroup tgtExeSl
-	procs = "cgroup.procs"
-
-	// suffix
-	suffix = ".slice"
-
-	// maintain path
-	MainGRP = "main"
-
-	// sub path
-	appProxyPath      = "app-proxy.slice"
-	globalNoProxyPath = "global-no-proxy.slice"
-)
-
-// cgroup priority
-const (
-	MainLevel = iota + 1
-	AppProxyLevel
-	GlobalProxyLevel
-)
-
-// proc message
-type ProcMessage struct {
-	execPath    string // exe path
-	cgroup2Path string // mark origin cgroup v2 path
-	pid         string // pid
-}
-
-// cgroup
-type CGroupMember struct {
-	parent *CGroupManager
-
-	priority int
-
-	// name
-	path string // main-proc.slice ...
-
-	// target exe path slice,   /usr/sbin/NetworkManager
-	tgtExeSl []string //
-
-	// current process map,  [/usr/sbin/NetworkManager][1 12256]
-	procMap map[string][]ProcMessage
-}
-
-func newGrpMsg() *CGroupMember {
-	return &CGroupMember{
-		tgtExeSl: []string{},
-		procMap:  make(map[string][]ProcMessage),
-	}
-}
-
-// get cgroup tgtExeSl path  as /sys/fs/cgroup/unified/main-proc.slice/cgroup.procs
-func (p *CGroupMember) getProcsPath() string {
-	path := filepath.Join(p.getProcsDir(), procs)
-	return path
-}
-
-func (p *CGroupMember) getProcsDir() string {
-	return filepath.Join(cgroup2Path, p.path+suffix)
-}
-
-// add module exec paths
-func (p *CGroupMember) addTgtExes(exePaths []string) {
-	for _, path := range exePaths {
-		p.addTgtExe(path)
-	}
-}
-
-// add module exec path
-func (p *CGroupMember) addTgtExe(exePath string) {
-	// check if already exist
-	ifc, update, err := com.MegaAdd(p.tgtExeSl, exePath)
-	if err != nil {
-		logger.Warningf("[%s] add tgtExe [%s] failed, err: %v", p.path, exePath, err)
-		return
-	}
-	// check if need update
-	if !update {
-		logger.Debugf("[%s] dont add tgtExe [%s], already exist", p.path, exePath)
-		return
-	}
-	// check if type correct
-	strSl, ok := ifc.([]string)
-	if !ok {
-		logger.Warningf("[%s] add tgtExe [%s] failed, ifc is not string slice", p.path, exePath)
-		return
-	}
-	// recover
-	p.tgtExeSl = strSl
-	logger.Debugf("[%s] add tgtExe [%s] failed success", p.path, exePath)
-}
-
-// del module tgtExeSl paths
-func (p *CGroupMember) delTgtExes(exePaths []string) {
-	for _, path := range exePaths {
-		p.delTgtExe(path)
-	}
-}
-
-// del module exec path
-func (p *CGroupMember) delTgtExe(exePath string) {
-	// check if already exist
-	ifc, update, err := com.MegaDel(p.tgtExeSl, exePath)
-	if err != nil {
-		logger.Warningf("[%s] delete tgtExe [%s] failed, err: %v", p.path, exePath, err)
-		return
-	}
-	// check if need update
-	if !update {
-		logger.Debugf("[%s] dont need delete tgtExe [%s], not exist", p.path, exePath)
-		return
-	}
-	// check if type correct
-	strSl, ok := ifc.([]string)
-	if !ok {
-		logger.Warningf("[%s] delete tgtExe [%s] failed, ifc is not string slice", p.path, exePath)
-		return
-	}
-	// recover
-	p.tgtExeSl = strSl
-	logger.Debugf("[%s] delete tgtExe [%s] success", p.path, exePath)
-}
-
-// check if exe path exist
-func (p *CGroupMember) existTgtExe(exePath string) bool {
-	for _, exe := range p.tgtExeSl {
-		if exe == exePath {
-			logger.Debugf("[%s] tgtExe [%s] found", p.path, exePath)
-			return true
-		}
-	}
-	logger.Debugf("[%s] tgtExe [%s] not found", exePath, p.path)
-	return false
-}
-
-// add proc to cgroup
-func (p *CGroupMember) addCrtProc(proc ProcMessage, active bool) error {
-	// check if key exist, if not , add key
-	procSl, ok := p.procMap[proc.execPath]
-	if !ok {
-		logger.Debugf("[%s] add crtProc dont include exe [%s]", p.path, proc.execPath)
-		procSl = []ProcMessage{}
-	}
-	// try to add
-	ifc, update, err := com.MegaAdd(procSl, proc)
-	if err != nil {
-		logger.Warningf("[%s] add crtProc [%v] failed, err: %v", p.path, proc, err)
-		return err
-	}
-	// if update
-	if !update {
-		logger.Debugf("[%s] dont need add crtProc [%v], already exist", p.path, proc)
-		return nil
-	}
-	// check if type correct
-	procSl, ok = ifc.([]ProcMessage)
-	if !ok {
-		logger.Warningf("[%s] add crtProc [%v] failed, ifc is ProcMessage slice", p.path, proc)
-		return errors.New("ifc is not match")
-	}
-	// add pid to sl
-	p.procMap[proc.execPath] = procSl
-
-	if active {
-		err = AddCGroup(proc.pid, p.getProcsPath())
-	}
-	return nil
-}
-
-// del proc from cgroup
-func (p *CGroupMember) delCrtProc(proc ProcMessage, active bool) error {
-	// check if key exist, if not , add key
-	procSl, ok := p.procMap[proc.execPath]
-	if !ok {
-		logger.Debugf("[%s] delete crtProc dont include exe [%s]", p.path, proc.execPath)
-		return nil
-	}
-	// try to add
-	ifc, update, err := com.MegaDel(procSl, proc)
-	if err != nil {
-		logger.Warningf("[%s] delete crtProc [%v] failed, err: %v", p.path, proc, err)
-		return err
-	}
-	// if update
-	if !update {
-		logger.Debugf("[%s] dont need delete crtProc [%v], not exist", p.path, proc)
-		return nil
-	}
-	// check if type correct
-	procSl, ok = ifc.([]ProcMessage)
-	if !ok {
-		logger.Warningf("[%s] delete crtProc [%v] failed, ifc is ProcMessage slice", p.path, proc)
-		return errors.New("ifc is not match")
-	}
-	// add pid to sl
-	p.procMap[proc.execPath] = procSl
-	// del from cgroup
-	if active {
-
-	}
-	return nil
-}
-
-// find pid and return index
-func (p *CGroupMember) existProc(proc ProcMessage) bool {
-	// check if length is 0
-	if len(p.procMap) == 0 {
-		logger.Debugf("[%s] check proc [%v] not exist, map length is 0", p.path, proc)
-		return false
-	}
-	// proc slice
-	procSl, ok := p.procMap[proc.execPath]
-	if !ok {
-		logger.Debugf("[%s] check proc [%v] not exist, slice length is 0", p.path, proc)
-		return false
-	}
-	// check range
-	for _, elem := range procSl {
-		if reflect.DeepEqual(elem, proc) {
-			logger.Debugf("[%s] check proc [%v] exist", p.path, proc)
-			return true
-		}
-	}
-	logger.Debugf("[%s] check proc [%v] not exist", p.path, proc)
-	return false
-}
-
 // cgroup v2 /sys/fs/cgroup/unified
 type CGroupManager struct {
 	CGroups []*CGroupMember // map[priority]CGroupMember
+
+	// proc service
+	procsService *netlink.Procs
+
+	// all procs message
+	// procMap map[string][]ProcMessage
 
 	// lock
 	lock sync.Mutex
@@ -261,6 +34,7 @@ type CGroupManager struct {
 func NewCGroupManager() *CGroupManager {
 	return &CGroupManager{
 		CGroups: []*CGroupMember{},
+		// procMap: make(map[string][]ProcMessage),
 	}
 }
 
@@ -309,43 +83,43 @@ func (c *CGroupManager) CreateCGroup(level int, elemPath string) (*CGroupMember,
 	return member, nil
 }
 
-// add proc path to cgroup elem
-func (c *CGroupManager) AddCGroupProcs(elem string, procs []string) {
-	// lock
-	c.lock.Lock()
-	defer c.lock.Unlock()
+//// add proc path to cgroup elem
+//func (c *CGroupManager) AddCGroupProcs(elem string, procs []string) {
+//	// lock
+//	c.lock.Lock()
+//	defer c.lock.Unlock()
+//
+//	// add
+//	for _, cgroup := range c.CGroups {
+//		if cgroup.path == elem {
+//			logger.Debugf("cgroup [%s] found in manager, begin to add tgtExeSl [%s]", elem, procs)
+//			cgroup.AddTgtExes(procs)
+//			return
+//		}
+//	}
+//	// if not found, out put log
+//	logger.Warningf("cgroup [%s] not found in manager", elem)
+//}
+//
+//// add proc path to cgroup elem
+//func (c *CGroupManager) DelCGroupProcs(elem string, procs []string) {
+//	// lock
+//	c.lock.Lock()
+//	defer c.lock.Unlock()
+//
+//	// add
+//	for _, cgroup := range c.CGroups {
+//		if cgroup.path == elem {
+//			logger.Debugf("cgroup [%s] found in manager, begin to del proc [%s]", elem, procs)
+//			cgroup.delTgtExes(procs)
+//			return
+//		}
+//	}
+//	// if not found, out put log
+//	logger.Warningf("cgroup [%s] not found in manager", elem)
+//}
 
-	// add
-	for _, cgroup := range c.CGroups {
-		if cgroup.path == elem {
-			logger.Debugf("cgroup [%s] found in manager, begin to add tgtExeSl [%s]", elem, procs)
-			cgroup.addTgtExes(procs)
-			return
-		}
-	}
-	// if not found, out put log
-	logger.Warningf("cgroup [%s] not found in manager", elem)
-}
-
-// add proc path to cgroup elem
-func (c *CGroupManager) DelCGroupProcs(elem string, procs []string) {
-	// lock
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	// add
-	for _, cgroup := range c.CGroups {
-		if cgroup.path == elem {
-			logger.Debugf("cgroup [%s] found in manager, begin to del proc [%s]", elem, procs)
-			cgroup.delTgtExes(procs)
-			return
-		}
-	}
-	// if not found, out put log
-	logger.Warningf("cgroup [%s] not found in manager", elem)
-}
-
-func (c *CGroupManager) GetCGroupMessage(exe string) *CGroupMember {
+func (c *CGroupManager) GetCGroupMember(exe string) *CGroupMember {
 	// lock
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -363,12 +137,53 @@ func (c *CGroupManager) GetCGroupMessage(exe string) *CGroupMember {
 
 func (c *CGroupManager) GetCGroupProcsPath(exe string) string {
 	// search which cgroup, proc exist
-	cgroup := c.GetCGroupMessage(exe)
+	cgroup := c.GetCGroupMember(exe)
 	if cgroup == nil {
 		return ""
 	}
 	// if found
 	return cgroup.path
+}
+
+func (c *CGroupManager) getProcs() (map[string][]ProcMessage, error) {
+	// check if proc service is nil
+	if c.procsService == nil {
+		logger.Warning("get proc failed, proc service nit init")
+		return nil, errors.New("get proc failed, proc service nit init")
+	}
+	// get procs from DBus service
+	procs, err := c.procsService.Procs().Get(0)
+	if err != nil {
+		logger.Warningf("get procs failed, err: %v", err)
+		return nil, err
+	}
+	// value map[string]ProcMessage
+
+	// temp proc message
+	temProcs := make(map[string][]ProcMessage)
+	for _, proc := range procs {
+		// get slice
+		procSl, ok := temProcs[proc.ExecPath]
+		if !ok {
+			procSl = []ProcMessage{}
+			temProcs[proc.ExecPath] = procSl
+		}
+		// mega add
+		ifc, _, err := com.MegaAdd(procSl, proc)
+		if err != nil {
+			logger.Warningf("mega add failed, err: %v", err)
+			continue
+		}
+		// convert slice
+		procSl, ok = ifc.([]ProcMessage)
+		if !ok {
+			logger.Warning("convert ProcMessage slice failed")
+			continue
+		}
+		temProcs[proc.ExecPath] = procSl
+	}
+	logger.Debugf("get procs success, procs: %v", temProcs)
+	return temProcs, nil
 }
 
 func (c *CGroupManager) Listen() error {
@@ -377,11 +192,11 @@ func (c *CGroupManager) Listen() error {
 		logger.Warningf("create system bus failed, err: %v", err)
 		return err
 	}
-	procs := netlink.NewProcs(systemBus)
+	c.procsService = netlink.NewProcs(systemBus)
 	// listen proc exec
-	_, err = procs.ConnectExecProc(func(execPath string, cgroup2Path string, pid string) {
+	_, err = c.procsService.ConnectExecProc(func(execPath string, cgroup2Path string, pid string) {
 		// get cgroup member
-		cgroup := c.GetCGroupMessage(execPath)
+		cgroup := c.GetCGroupMember(execPath)
 		if cgroup == nil {
 			logger.Debugf("exe [%s] cant found in any cgroup", execPath)
 			return
@@ -396,9 +211,9 @@ func (c *CGroupManager) Listen() error {
 		err = cgroup.addCrtProc(proc, true)
 	})
 	// listen proc exist
-	_, err = procs.ConnectExitProc(func(execPath string, cwdPath string, pid string) {
+	_, err = c.procsService.ConnectExitProc(func(execPath string, cgroup2Path string, pid string) {
 		// get cgroup member
-		cgroup := c.GetCGroupMessage(execPath)
+		cgroup := c.GetCGroupMember(execPath)
 		if cgroup == nil {
 			logger.Debugf("exe [%s] cant found in any cgroup", execPath)
 			return
@@ -411,7 +226,6 @@ func (c *CGroupManager) Listen() error {
 		// kernel delete proc
 		err = cgroup.delCrtProc(proc, false)
 	})
-
 	return nil
 }
 
