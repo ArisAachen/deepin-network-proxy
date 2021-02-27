@@ -21,6 +21,9 @@ type BaseProxy interface {
 	// getScope() tProxy.ProxyScope
 	getDBusPath() dbus.ObjectPath
 
+	// get cgroup v2 level
+	getCGroupLevel() int
+
 	// cgroup v2
 	initCGroup() error
 	addCGroupProcs(elem string, procs []string)

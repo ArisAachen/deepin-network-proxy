@@ -394,19 +394,82 @@ func GetProcStartTime(pid uint32) (uint64, error) {
 	return uint64(time), nil
 }
 
-// use to mega del elem from slice and map
-func MegaDel(src interface{}, tgt interface{}) error {
+// use to mega add elem to slice and map     result add err
+func MegaAdd(src interface{}, tgt interface{}) (interface{}, bool, error) {
 	// check kind, only map and slice support mega del
-	kind := reflect.TypeOf(src).Kind()
-	if kind != reflect.Slice && kind != reflect.Map {
-		return errors.New("source type is not slice or map")
+	srcTyp := reflect.TypeOf(src)
+	if srcTyp.Kind() != reflect.Slice && srcTyp.Kind() != reflect.Map {
+		return nil, false, errors.New("source type is not slice or map")
 	}
-	//
-	if kind == reflect.Slice {
-
+	// check if elem type is the same with target
+	//elem := srcTyp.Elem()
+	if srcTyp.Elem() != reflect.TypeOf(tgt) {
+		return nil, false, errors.New("src base typ is not same with target")
 	}
+	// check if slice
+	if srcTyp.Kind() == reflect.Slice {
+		values := reflect.ValueOf(src)
+		// cycle
+		var index = 0
+		for ; index < values.Len(); index++ {
+			// convert index to interface
+			cmpValue := values.Index(index).Interface()
+			// check if elem equal with target
+			if reflect.DeepEqual(cmpValue, tgt) {
+				break
+			}
+		}
+		// if already exist
+		if index != values.Len() {
+			return src, false, nil
+		}
+		// append to last
+		result := reflect.Append(values, reflect.ValueOf(tgt))
+		return result, true, nil
+	}
+	return nil, false, nil
+}
 
-	return nil
+// use to mega del elem from slice and map      result del err
+func MegaDel(src interface{}, tgt interface{}) (interface{}, bool, error) {
+	// check kind, only map and slice support mega del
+	srcTyp := reflect.TypeOf(src)
+	if srcTyp.Kind() != reflect.Slice && srcTyp.Kind() != reflect.Map {
+		return nil, false, errors.New("source type is not slice or map")
+	}
+	// check if elem type is the same with target
+	//elem := srcTyp.Elem()
+	if srcTyp.Elem() != reflect.TypeOf(tgt) {
+		return nil, false, errors.New("src base typ is not same with target")
+	}
+	// check if slice
+	if srcTyp.Kind() == reflect.Slice {
+		values := reflect.ValueOf(src)
+		// cycle
+		var index = 0
+		for ; index < values.Len(); index++ {
+			// convert index to interface
+			cmpValue := values.Index(index).Interface()
+			// check if elem equal with target
+			if reflect.DeepEqual(cmpValue, tgt) {
+				break
+			}
+		}
+		// not exist
+		if index == values.Len() {
+			return src, false, nil
+		}
+		front := values.Slice(0, index)
+		// check special pos, if is the last elem
+		if index == values.Len()-1 {
+			return front, true, nil
+		}
+		// if not the last elem, including the first one
+		back := values.Slice(index+1, values.Len())
+		result := reflect.AppendSlice(front, back)
+		return result, true, nil
+	}
+	return nil, false, nil
 }
 
 // pid must be num

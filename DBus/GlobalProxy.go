@@ -3,6 +3,7 @@ package DBus
 import (
 	"fmt"
 
+	cgroup "github.com/DeepinProxy/CGroups"
 	config "github.com/DeepinProxy/Config"
 	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
@@ -64,10 +65,11 @@ func (mgr *GlobalProxy) initCGroup() error {
 		return err
 	}
 	// make dir
-	err = allCGroups.CreateCGroup(3, mgr.scope.String())
+	member, err := allCGroups.CreateCGroup(cgroup.GlobalProxyLevel, mgr.scope.String())
 	if err != nil {
 		return err
 	}
+	mgr.cgroupMember = member
 	logger.Debugf("[%s] create cgroup success", mgr.scope.String())
 	return nil
 }
@@ -75,6 +77,10 @@ func (mgr *GlobalProxy) initCGroup() error {
 // rewrite get scope
 func (mgr *GlobalProxy) getScope() tProxy.ProxyScope {
 	return tProxy.GlobalProxy
+}
+
+func (mgr *GlobalProxy) getCGroupLevel() int {
+	return cgroup.GlobalProxyLevel
 }
 
 // rewrite export DBus path

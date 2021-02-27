@@ -47,6 +47,9 @@ type proxyPrv struct {
 	// if proxy opened
 	Enabled bool
 
+	// proxyMember to organize cgroup v2
+	cgroupMember *cgroup.CGroupMember
+
 	// handler manager
 	handlerMgr *tProxy.HandlerMgr
 
@@ -125,12 +128,20 @@ func (mgr *proxyPrv) initCGroup() error {
 	onceCgp.Do(func() {
 		// init
 		allCGroups = cgroup.NewCGroupManager()
-
 		// add default slice, with the highest priority
-		err = allCGroups.CreateCGroup(1, cgroup.MainGRP)
-
+		_, err = allCGroups.CreateCGroup(cgroup.MainLevel, cgroup.MainGRP)
+		if err != nil {
+			logger.Warningf("init main cgroup failed, err: %v", err)
+			return
+		}
 		// add must ignore cgroup to level 1
 		mgr.addCGroupProcs(cgroup.MainGRP, mainProxy)
+		// startListen
+		err = allCGroups.Listen()
+		if err != nil {
+			logger.Warningf("listen failed, err: %v", err)
+			return
+		}
 	})
 	return err
 }
