@@ -430,6 +430,40 @@ func MegaAdd(src interface{}, tgt interface{}) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
+// mega insert elem to slice
+func MegaInsert(src interface{}, tgt interface{}, index int) (interface{}, bool, error) {
+	// check kind, only map and slice support mega del
+	srcTyp := reflect.TypeOf(src)
+	if srcTyp.Kind() != reflect.Slice && srcTyp.Kind() != reflect.Map {
+		return nil, false, errors.New("source type is not slice or map")
+	}
+	// check if elem type is the same with target
+	//elem := srcTyp.Elem()
+	if srcTyp.Elem() != reflect.TypeOf(tgt) {
+		return nil, false, errors.New("src base typ is not same with target")
+	}
+	// check if slice
+	if srcTyp.Kind() == reflect.Slice {
+		values := reflect.ValueOf(src)
+		tgtValue := reflect.ValueOf(tgt)
+		// check range
+		if values.Len() < index {
+			return nil, false, errors.New("insert index out of range")
+		}
+		front := values.Slice(0, index)
+		result := reflect.Append(front, tgtValue)
+		// insert at last index
+		if index == values.Len()-1 {
+			return result.Interface(), true, nil
+		}
+		// insert the central or beginning
+		back := values.Slice(index, values.Len())
+		result = reflect.AppendSlice(result, back)
+		return result, true, nil
+	}
+	return nil, false, nil
+}
+
 // use to mega del elem from slice and map      result del err
 func MegaDel(src interface{}, tgt interface{}) (interface{}, bool, error) {
 	// check kind, only map and slice support mega del
