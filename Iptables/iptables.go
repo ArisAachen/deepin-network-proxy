@@ -2,333 +2,127 @@ package Iptables
 
 import (
 	"errors"
-	com "github.com/DeepinProxy/Com"
 	"pkg.deepin.io/lib/log"
-	"reflect"
-	"strconv"
-	"strings"
 )
 
-/*
-	Iptables module extends
-	1. linux net flow redirect (now support)
-	2. transparent proxy (now support)
-	3. firewall (now support)
-	4. ipv4 (now support)       // iptables    may use nf_tables
-	5. ipv6 (not support yet)   // ip6tables   may use nf_tables
-*/
+// cant extends
+var defaultTables = []string{
+	"raw",
+	"mangle",
+	"nat",
+	"filter",
+}
 
-// https://linux.die.net/man/8/iptables
+// can extends
+var defaultChains = []string{
+	"PREROUTING",
+	"INPUT",
+	"FORWARD",
+	"OUTPUT",
+	"POSTROUTING",
+}
 
-var logger *log.Logger
+type TablesManager struct {
+	tablesMap []*TableRule
+}
 
-// action
-type Action int
-
-const (
-	ACCEPT Action = iota
-	DROP
-	RETURN
-	QUEUE
-	REDIRECT
-	MARK
-)
-
-func (a Action) ToString() string {
-	switch a {
-	case ACCEPT:
-		return "ACCEPT"
-	case DROP:
-		return "DROP"
-	case RETURN:
-		return "RETURN"
-	case QUEUE:
-		return "QUEUE"
-	case REDIRECT:
-		return "REDIRECT"
-	case MARK:
-		return "MARK"
-	default:
-		return ""
+// tables manager to manager table rules
+func NewTablesManager() *TablesManager {
+	// table manager
+	tableMgr := &TablesManager{
+		tablesMap: []*TableRule{},
 	}
+	// init default rules and chains
+	tableMgr.initRules()
+	return tableMgr
 }
 
-type Operation int
-
-const (
-	Append Operation = iota
-	Insert
-	New
-	Delete
-	XMov
-	Policy
-	Flush
-)
-
-func (a Operation) ToString() string {
-	switch a {
-	case Append:
-		return "A"
-	case Insert:
-		return "I"
-	case New:
-		return "N"
-	case Delete:
-		return "D"
-	case XMov:
-		return "X"
-	case Policy:
-		return "P"
-	case Flush:
-		return "F"
-	default:
-		return ""
-	}
-}
-
-// base rule
-type baseRule struct {
-	match string // -s
-	param string // 1111.2222.3333.4444
-}
-
-// make string
-func (bs *baseRule) String() string {
-	return "-" + bs.match + " " + bs.param
-}
-
-// extends elem
-type extendsElem struct {
-	match string     // mark
-	base  []baseRule // --mark 1
-}
-
-// make string   mark --mark 1
-func (elem *extendsElem) StringSl() []string {
-	// match
-	result := []string{elem.match}
-	// param
-	for _, bs := range elem.base {
-		result = append(result, "--"+bs.match, bs.param)
-	}
-	return result
-}
-
-// extends rule
-type extendsRule struct {
-	match string        // -m
-	base  []extendsElem // mark --mark 1
-}
-
-// make string  -m mark --mark 1
-func (ex *extendsRule) StringSl() []string {
-	// match
-	result := []string{"-" + ex.match}
-	// param
-	for _, elem := range ex.base {
-		result = append(result, elem.StringSl()...)
-	}
-	return result
-}
-
-// container to contain one complete rule
-type containRule struct {
-	action  Action // ACCEPT DROP RETURN QUEUE REDIRECT MARK
-	bsRules []baseRule
-	exRules []extendsRule
-}
-
-// make string     -j ACCEPT -s 1111.2222.3333.4444 -m mark --set-mark 1
-func (cn *containRule) StringSl() []string {
-	var result []string
-	result = append(result, "-j", cn.action.ToString())
-	// add base rules
-	for _, bs := range cn.bsRules {
-		result = append(result, bs.String())
-	}
-	// add extends rules
-	for _, ex := range cn.exRules {
-		result = append(result, ex.StringSl()...)
-	}
-	return result
-}
-
-// chain rule
-type ChainRule struct {
-	chain     string        // chain name: PREROUTING INPUT FORWARD OUTPUT POSTROUTING
-	parent    *ChainRule    // parent chain, if has not, is nil
-	sonSl     []*ChainRule  // son chain set, if not, is nil
-	containSl []containRule //
-}
-
-// make string        -A OUTPUT slice[-j ACCEPT -s 1111.2222.3333.4444 -m mark --set-mark 1]
-func (c *ChainRule) StringSl() []string {
-	var result []string
-	for index, contain := range c.containSl {
-		entry := []string{"-I", c.chain, strconv.Itoa(index)}
-		entry = append(entry, contain.StringSl()...)
-		result = append(result, strings.Join(entry, " "))
-	}
-	return result
-}
-
-// exec iptables command and add to record
-func (c *ChainRule) add(action Action, base []baseRule, extends []extendsRule) error {
-	return c.insert(0, action, base, extends)
-}
-
-// check if allow add
-func (c *ChainRule) valid(index int, contain containRule) bool {
-	// check index pos
-	if index > len(c.containSl) {
-		logger.Warningf("[%s] insert invalid, length out of range", c.chain)
-		return false
-	}
-	// check if already exist
-	for _, elem := range c.containSl {
-		if reflect.DeepEqual(elem, contain) {
-			logger.Warningf("[%s] insert invalid, [%v] already exist", c.chain, contain)
-			return false
+// init default iptables rules
+func (m *TablesManager) initRules() {
+	// init default tables
+	for _, table := range defaultTables {
+		// add table to table manager
+		tbRule := NewTableRule(table)
+		// init default chains to table
+		for _, chain := range defaultChains {
+			switch chain {
+			// init PREROUTING chain    raw mangle nat
+			case "PREROUTING":
+				if table == "raw" || table == "mangle" || table == "nat" {
+					logger.Debugf("[%s] table add chain [%s]", table, chain)
+					cnRule := &ChainRule{
+						chain: chain,
+					}
+					tbRule.chains[chain] = cnRule
+				}
+				break
+				// init INPUT chain     mangle filter
+			case "INPUT":
+				if table == "filter" || table == "mangle" {
+					logger.Debugf("[%s] table add chain [%s]", table, chain)
+					cnRule := &ChainRule{
+						chain: chain,
+					}
+					tbRule.chains[chain] = cnRule
+				}
+				break
+				// init FORWARD chain     mangle filter
+			case "FORWARD":
+				if table == "filter" || table == "mangle" {
+					logger.Debugf("[%s] table add chain [%s]", table, chain)
+					cnRule := &ChainRule{
+						chain: chain,
+					}
+					tbRule.chains[chain] = cnRule
+				}
+				break
+				// init OUTPUT   all support
+			case "OUTPUT":
+				logger.Debugf("[%s] table add chain [%s]", table, chain)
+				cnRule := &ChainRule{
+					chain: chain,
+				}
+				tbRule.chains[chain] = cnRule
+				break
+				// init OUTPUT  mangle nat
+			case "POSTROUTING":
+				if table == "nat" || table == "mangle" {
+					logger.Debugf("[%s] table add chain [%s]", table, chain)
+					cnRule := &ChainRule{
+						chain: chain,
+					}
+					tbRule.chains[chain] = cnRule
+				}
+				break
+			default:
+				logger.Warningf("init unknown chain [%s]", chain)
+			}
 		}
 	}
-	logger.Debugf("[%s] add [%v] valid", c.chain, contain.StringSl())
-	return true
 }
 
-func (c *ChainRule) insert(index int, action Action, base []baseRule, extends []extendsRule) error {
-	// make contain
-	contain := containRule{
-		action:  action,
-		bsRules: base,
-		exRules: extends,
-	}
-	// insert at the beginning
-	ifc, update, err := com.MegaInsert(c.containSl, contain, index)
-	if err != nil {
-		logger.Warningf("[%s] insert rule failed, err: %v", c.chain, err)
-		return err
-	}
-	// check if already exist
-	if !update {
-		logger.Debugf("[%s] dont need insert rule [%v], already exist", c.chain, contain.StringSl())
-		return nil
-	}
-	// check type
-	temp, ok := ifc.([]containRule)
-	if !ok {
-		logger.Warningf("[%s] add rule failed, convert type failed", c.chain)
-		return errors.New("convert type failed")
-	}
-	c.containSl = temp
-	logger.Debugf("[%s] insert at [%d] rule success, rule: %s ", c.chain, index, contain.StringSl())
-	return nil
-}
+// create new chain,    new chain show attach to default
+func (m *TablesManager) CreateChain(table string, parent string, index int, chain string) error {
+	// check if create default chain
 
-// will not use now
-func (c *ChainRule) del(index int) error {
-
-	return nil
-}
-
-// clear son rule and self
-func (c *ChainRule) clear() error {
-	// clear son
-	for _, son := range c.sonSl {
-		_ = son.clear()
-
-	}
-	// delete self
-	c.containSl = nil
-	return nil
-}
-
-// set parent if need
-func (c *ChainRule) attach(parent *ChainRule) error {
-	// check valid
-	if parent == nil {
-		logger.Warningf("[%s] cant attach parent, parent is nil", c.chain)
-		return nil
-	}
-	// set parent
-	c.parent = parent
-	// append son
-	parent.sonSl = append(parent.sonSl, c)
-	return nil
-}
-
-// table rule contains many chains     key:-t mangle value:[OUTPUT]slice[],[INPUT]slice[]
-type TableRule struct {
-	table  string               // table name:  raw mangle filter nat
-	chains map[string]ChainRule //
-}
-
-func (t *TableRule) StringSl() []string {
-	var result []string
-	for _, table := range t.chains {
-		entry := []string{"-t", t.table}
-		for _, rule := range table.StringSl() {
-			entry = append(entry, rule)
-			result = append(result, strings.Join(entry, " "))
+	// search table
+	var tbRule *TableRule
+	for _, rule := range m.tablesMap {
+		if rule.table == table {
+			tbRule = rule
+			logger.Debugf("table [%s] found, allow to add", table)
+			break
 		}
 	}
-	return result
-}
+	// check if table name exist
+	if tbRule == nil {
+		return errors.New("table dont exist")
+	}
 
-// create table rule
-func NewTableRule(name string) *TableRule {
-	rule := &TableRule{
-		table: name,
-	}
-	return rule
-}
-
-// add rule to table
-func (t *TableRule) AddRule(chain string, action Action, base []baseRule, extends []extendsRule) error {
-	return t.InsertRule(chain, 1, action, base, extends)
-}
-
-// insert rule
-func (t *TableRule) InsertRule(chain string, index int, action Action, base []baseRule, extends []extendsRule) error {
-	// check if valid to add
-	rule, ok := t.chains[chain]
-	if !ok {
-		logger.Warningf("[%s] dont allow add rule, chain [%s] not exist", t.table, chain)
-		return errors.New("chain not exist")
-	}
-	// contain
-	contain := containRule{
-		action:  action,
-		bsRules: base,
-		exRules: extends,
-	}
-	// check if rule is valid
-	if !rule.valid(index, contain) {
-		logger.Warningf("[%s] add invalid, chain [%s], pos[%d], rule [%s]", t.table, chain, index, contain.StringSl())
-		return nil
-	}
-	// run rule command
-	rCmd := RuleCommand{
-		soft:      "iptables",
-		table:     t.table,
-		operation: Append,
-		chain:     chain,
-		index:     index,
-		contain:   contain,
-	}
-	// run
-	_, err := rCmd.CombinedOutput()
-	if err != nil {
-		return err
-	}
-	// run success, store command
-	err = rule.insert(index, action, base, extends)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 func init() {
-	logger = log.NewLogger("daemon/proxy")
+	logger = log.NewLogger("daemon/iptables")
 	logger.SetLogLevel(log.LevelDebug)
 }

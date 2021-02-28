@@ -230,6 +230,6 @@ func (c *CGroupManager) Listen() error {
 }
 
 func init() {
-	logger = log.NewLogger("daemon/proxy")
+	logger = log.NewLogger("daemon/cgroup")
 	logger.SetLogLevel(log.LevelDebug)
 }
