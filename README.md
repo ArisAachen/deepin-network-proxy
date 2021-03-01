@@ -1,2 +1,16 @@
 # Introduction
-Write app and global proxy for deepin 
+提供了整套的代理解决方案，并提供了扩展性服务。
+
+## Module
+
+1. NetLink
+用于监听当前运行的所有进程，并列出运行的pid，运行路径和CGroup v2的所属路径。
+
+2. CGroup
+用于对应用进行分类管理，可控制应用使用系统资源。
+
+3. TProxy
+用于系统和应用的透明代理，自定义代理规则。
+
+4. IPtables
+用于指定防火墙，网络转发和透明代理。
