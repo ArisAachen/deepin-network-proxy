@@ -257,6 +257,35 @@ func (c *ChainRule) attach(parent *ChainRule) error {
 	return nil
 }
 
+func (c *ChainRule) detach() error {
+	// check valid
+	if c.parent == nil {
+		logger.Warningf("[%s] cant attach parent, parent is nil", c.chain)
+		return nil
+	}
+	// try to add
+	ifc, update, err := com.MegaDel(c.parent.sonSl, c)
+	if err != nil {
+		logger.Warningf("[%s] detach chain from [%s] failed, err: %v", c.chain, c.parent.chain, err)
+		return err
+	}
+	// if update
+	if !update {
+		logger.Debugf("[%s] dont need detach chain from [%s], not exist", c.chain, c.parent.chain)
+		return nil
+	}
+	// check if type correct
+	sonSl, ok := ifc.([]*ChainRule)
+	if !ok {
+		logger.Warningf("[%s] delete chain from [%s] failed, ifc is ProcMessage slice", c.chain, c.parent.chain)
+		return errors.New("ifc is not match")
+	}
+	// add pid to sl
+	c.parent.sonSl = sonSl
+	logger.Debugf("[%s] delete chain from [%s] success", c.chain, c.parent.chain)
+	return nil
+}
+
 // table rule contains many chains     key:-t mangle value:[OUTPUT]slice[],[INPUT]slice[]
 type TableRule struct {
 	table  string                // table name:  raw mangle filter nat
@@ -285,15 +314,90 @@ func NewTableRule(name string) *TableRule {
 
 // del chain
 func (t *TableRule) DelChain(chain string) error {
+	// cant delete default chain
 	for _, name := range defaultChains {
 		if name == chain {
 			logger.Debugf("[%s] del chain failed, chain is basic [%s]", t.table, chain)
 			return errors.New("delete default chain")
 		}
 	}
-
-
+	// get chain
+	cnRule, ok := t.chains[chain]
+	if !ok {
+		return errors.New("delete chain not exist")
+	}
+	// clear self
+	rCmd := RuleCommand{
+		soft:      "iptables",
+		table:     t.table,
+		operation: Flush,
+		chain:     chain,
+	}
+	// run to delete rules
+	_, err := rCmd.CombinedOutput()
+	if err != nil {
+		logger.Warningf("delete chain failed, err: %v", err)
+		return err
+	}
+	_ = cnRule.clear()
+	// check if has parent
+	if cnRule.parent != nil {
+		// sudo iptables -D OUTPUT -j New
+		rCmd = RuleCommand{
+			soft:      "iptables",
+			table:     t.table,
+			operation: Delete,
+			chain:     cnRule.parent.chain,
+			contain: containRule{
+				action: chain,
+			},
+		}
+		// run to delete rules
+		_, err := rCmd.CombinedOutput()
+		if err != nil {
+			logger.Warningf("detach chain from parent failed, err: %v", err)
+			return err
+		}
+		err = cnRule.detach()
+		if err != nil {
+			logger.Warningf("detach chain from parent failed, err: %v", err)
+			return err
+		}
+		logger.Debugf("detach chain [%s] from parent success", chain)
+	}
+	// delete chain
+	// sudo iptables -t mangle -X New
+	rCmd = RuleCommand{
+		soft:      "iptables",
+		table:     t.table,
+		operation: XMov,
+		chain:     chain,
+	}
+	_, err = rCmd.CombinedOutput()
+	if err != nil {
+		logger.Warningf("remove chain failed, err: %v", err)
+		return err
+	}
+	logger.Debugf("remove chain [%s] success", chain)
 	return nil
+}
+
+// append chain at the last
+func (t *TableRule) AppendChain(parent string, chain string) error {
+	// must attach in old
+	parentRule, ok := t.chains[parent]
+	if !ok {
+		logger.Warningf("[%s] create chain failed, parent [%s] not exist", t.table, parent)
+		return errors.New("parent not exist")
+	}
+	index := len(parentRule.containSl)
+	return t.CreateChain(parent, index, chain)
+}
+
+// add chain at the front
+func (t *TableRule) AddChain(parent string, chain string) error {
+	// must attach in old
+	return t.CreateChain(parent, 0, chain)
 }
 
 // create chain
@@ -336,7 +440,7 @@ func (t *TableRule) CreateChain(parent string, index int, chain string) error {
 		table:     t.table,
 		operation: Insert,
 		chain:     parent,
-		index:     index,
+		index:     index + 1,
 		contain:   contain,
 	}
 	// try to attach

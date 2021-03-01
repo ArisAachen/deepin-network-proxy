@@ -118,8 +118,8 @@ func (m *TablesManager) CreateChain(table string, parent string, index int, chai
 	if tbRule == nil {
 		return errors.New("table dont exist")
 	}
-
-	return nil
+	// add chain to table
+	return tbRule.CreateChain(parent, index, chain)
 }
 
 func init() {
