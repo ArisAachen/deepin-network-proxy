@@ -3,7 +3,9 @@ package DBus
 import (
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 
 	cgroup "github.com/DeepinProxy/CGroups"
@@ -180,6 +182,16 @@ func (mgr *proxyPrv) initIptables() error {
 		if err != nil {
 			logger.Warningf("[%s] create chain failed, err: %v", mgr.scope, err)
 		}
+		logger.Debugf("[%s] add default chain success", mgr.scope)
+		// add new local table
+		args := []string{"ip route", "add", "local default", "dev lo", "table 100"}
+		cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
+		logger.Debugf("[%s] start to add rule: %s", mgr.scope, cmd.String())
+		buf, err := cmd.CombinedOutput()
+		if err != nil {
+			logger.Warningf("[%s] run ip route failed, out: %s, err: %v", mgr.scope, string(buf), err)
+		}
+		logger.Debugf("[%s] add ip route success", mgr.scope)
 	})
 	return nil
 }

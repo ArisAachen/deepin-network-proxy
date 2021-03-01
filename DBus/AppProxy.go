@@ -7,8 +7,10 @@ import (
 	iptables "github.com/DeepinProxy/Iptables"
 	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
+	"os/exec"
 	"pkg.deepin.io/lib/dbusutil"
 	"strconv"
+	"strings"
 )
 
 type AppProxy struct {
@@ -104,6 +106,7 @@ func (mgr *AppProxy) initIptables() error {
 		logger.Warningf("[%s] init global iptables failed, err: %v", err)
 		return err
 	}
+	// create app chain
 	extends := []iptables.ExtendsRule{
 		iptables.ExtendsRule{
 			Match: "m",
@@ -144,6 +147,7 @@ func (mgr *AppProxy) initIptables() error {
 	}
 	logger.Debugf("[%s] add mark success", mgr.scope)
 
+	// add redirect
 	extends = []iptables.ExtendsRule{
 		iptables.ExtendsRule{
 			Match: "m",
@@ -176,6 +180,16 @@ func (mgr *AppProxy) initIptables() error {
 	if err != nil {
 		logger.Warningf("[%s] add transparent rule failed, err: %v", mgr.scope, err)
 	}
+	// add ip rule
+	args := []string{"ip rule", "add fwmark", strconv.Itoa(mgr.Proxies.TPort), "lookup", "table 100"}
+	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
+	logger.Debugf("[%s] start to add ip rule %s", cmd.String())
+	buf, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Warningf("[%s] add ip rule failed, out: %s, err :%v", mgr.scope, string(buf), err)
+		return err
+	}
+	logger.Debugf("[%s] add ip rule success", mgr.scope)
 	return nil
 }
 
