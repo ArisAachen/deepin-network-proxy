@@ -32,6 +32,7 @@ const (
 	RETURN   = "RETURN"
 	QUEUE    = "QUEUE"
 	REDIRECT = "REDIRECT"
+	TPROXY   = "TPROXY"
 	MARK     = "MARK"
 )
 
@@ -88,45 +89,45 @@ func (a Operation) ToString() string {
 }
 
 // base rule
-type baseRule struct {
-	match string // -s
-	param string // 1111.2222.3333.4444
+type BaseRule struct {
+	Match string // -s
+	Param string // 1111.2222.3333.4444
 }
 
 // make string
-func (bs *baseRule) String() string {
-	return "-" + bs.match + " " + bs.param
+func (bs *BaseRule) String() string {
+	return "-" + bs.Match + " " + bs.Param
 }
 
 // extends elem
-type extendsElem struct {
-	match string     // mark
-	base  []baseRule // --mark 1
+type ExtendsElem struct {
+	Match string     // mark
+	Base  []BaseRule // --mark 1
 }
 
 // make string   mark --mark 1
-func (elem *extendsElem) StringSl() []string {
+func (elem *ExtendsElem) StringSl() []string {
 	// match
-	result := []string{elem.match}
+	result := []string{elem.Match}
 	// param
-	for _, bs := range elem.base {
-		result = append(result, "--"+bs.match, bs.param)
+	for _, bs := range elem.Base {
+		result = append(result, "--"+bs.Match, bs.Param)
 	}
 	return result
 }
 
 // extends rule
-type extendsRule struct {
-	match string        // -m
-	base  []extendsElem // mark --mark 1
+type ExtendsRule struct {
+	Match string        // -m
+	Base  []ExtendsElem // mark --mark 1
 }
 
 // make string  -m mark --mark 1
-func (ex *extendsRule) StringSl() []string {
+func (ex *ExtendsRule) StringSl() []string {
 	// match
-	result := []string{"-" + ex.match}
+	result := []string{"-" + ex.Match}
 	// param
-	for _, elem := range ex.base {
+	for _, elem := range ex.Base {
 		result = append(result, elem.StringSl()...)
 	}
 	return result
@@ -135,14 +136,16 @@ func (ex *extendsRule) StringSl() []string {
 // container to contain one complete rule
 type containRule struct {
 	action  string // ACCEPT DROP RETURN QUEUE REDIRECT MARK
-	bsRules []baseRule
-	exRules []extendsRule
+	bsRules []BaseRule
+	exRules []ExtendsRule
 }
 
 // make string     -j ACCEPT -s 1111.2222.3333.4444 -m mark --set-mark 1
 func (cn *containRule) StringSl() []string {
 	var result []string
-	result = append(result, "-j", cn.action)
+	if cn.action != "" {
+		result = append(result, "-j", cn.action)
+	}
 	// add base rules
 	for _, bs := range cn.bsRules {
 		result = append(result, bs.String())
@@ -174,7 +177,7 @@ func (c *ChainRule) StringSl() []string {
 }
 
 // exec iptables command and add to record
-func (c *ChainRule) add(action string, base []baseRule, extends []extendsRule) error {
+func (c *ChainRule) add(action string, base []BaseRule, extends []ExtendsRule) error {
 	return c.insert(0, action, base, extends)
 }
 
@@ -196,7 +199,7 @@ func (c *ChainRule) valid(index int, contain containRule) bool {
 	return true
 }
 
-func (c *ChainRule) insert(index int, action string, base []baseRule, extends []extendsRule) error {
+func (c *ChainRule) insert(index int, action string, base []BaseRule, extends []ExtendsRule) error {
 	// make contain
 	contain := containRule{
 		action:  action,
@@ -307,7 +310,8 @@ func (t *TableRule) StringSl() []string {
 // create table rule
 func NewTableRule(name string) *TableRule {
 	rule := &TableRule{
-		table: name,
+		table:  name,
+		chains: make(map[string]*ChainRule),
 	}
 	return rule
 }
@@ -383,7 +387,7 @@ func (t *TableRule) DelChain(chain string) error {
 }
 
 // append chain at the last
-func (t *TableRule) AppendChain(parent string, chain string) error {
+func (t *TableRule) AppendChain(parent string, chain string, base []BaseRule, extends []ExtendsRule) error {
 	// must attach in old
 	parentRule, ok := t.chains[parent]
 	if !ok {
@@ -391,17 +395,20 @@ func (t *TableRule) AppendChain(parent string, chain string) error {
 		return errors.New("parent not exist")
 	}
 	index := len(parentRule.containSl)
-	return t.CreateChain(parent, index, chain)
+	if index > 0 {
+		index = index - 1
+	}
+	return t.CreateChain(parent, index, chain, base, extends)
 }
 
 // add chain at the front
-func (t *TableRule) AddChain(parent string, chain string) error {
+func (t *TableRule) AddChain(parent string, chain string, base []BaseRule, extends []ExtendsRule) error {
 	// must attach in old
-	return t.CreateChain(parent, 0, chain)
+	return t.CreateChain(parent, 0, chain, base, extends)
 }
 
 // create chain
-func (t *TableRule) CreateChain(parent string, index int, chain string) error {
+func (t *TableRule) CreateChain(parent string, index int, chain string, base []BaseRule, extends []ExtendsRule) error {
 	// must attach in old
 	parentRule, ok := t.chains[parent]
 	if !ok {
@@ -413,7 +420,7 @@ func (t *TableRule) CreateChain(parent string, index int, chain string) error {
 		action: chain,
 	}
 	// check if valid
-	if parentRule.valid(index, conRule) {
+	if !parentRule.valid(index, conRule) {
 		return errors.New("create chain invalid")
 	}
 	// run rule command
@@ -425,31 +432,12 @@ func (t *TableRule) CreateChain(parent string, index int, chain string) error {
 		chain:     chain,
 	}
 	// try to exec iptables to add chain
-	_, err := rCmd.CombinedOutput()
+	buf, err := rCmd.CombinedOutput()
 	if err != nil {
-		logger.Warningf("[%s] exec add new chain failed, err: %v", err)
+		logger.Warningf("[%s] exec add new chain failed, out: %s, err: %v", t.table, string(buf), err)
 		return err
 	}
-	// try to attach chain to parent
-	// iptables -w 60 -t mangle -I PREROUTING 1 -j GLOBAL_PROXY
-	contain := containRule{
-		action: chain,
-	}
-	rCmd = RuleCommand{
-		soft:      "iptables",
-		table:     t.table,
-		operation: Insert,
-		chain:     parent,
-		index:     index + 1,
-		contain:   contain,
-	}
-	// try to attach
-	_, err = rCmd.CombinedOutput()
-	if err != nil {
-		logger.Warningf("[%s] exec attach [%s] to [%s] chain failed, err: %v", t.table, chain, parent, err)
-		return err
-	}
-	err = t.InsertRule(parent, index, chain, nil, nil)
+	err = t.InsertRule(parent, index, chain, base, extends)
 	if err != nil {
 		return err
 	}
@@ -464,12 +452,12 @@ func (t *TableRule) CreateChain(parent string, index int, chain string) error {
 }
 
 // add rule to table
-func (t *TableRule) AddRule(chain string, action string, base []baseRule, extends []extendsRule) error {
-	return t.InsertRule(chain, 1, action, base, extends)
+func (t *TableRule) AddRule(chain string, action string, base []BaseRule, extends []ExtendsRule) error {
+	return t.InsertRule(chain, 0, action, base, extends)
 }
 
 // insert rule
-func (t *TableRule) InsertRule(chain string, index int, action string, base []baseRule, extends []extendsRule) error {
+func (t *TableRule) InsertRule(chain string, index int, action string, base []BaseRule, extends []ExtendsRule) error {
 	// check if valid to add
 	rule, ok := t.chains[chain]
 	if !ok {
@@ -491,14 +479,15 @@ func (t *TableRule) InsertRule(chain string, index int, action string, base []ba
 	rCmd := RuleCommand{
 		soft:      "iptables",
 		table:     t.table,
-		operation: Append,
+		operation: Insert,
 		chain:     chain,
-		index:     index,
+		index:     index + 1,
 		contain:   contain,
 	}
 	// run
-	_, err := rCmd.CombinedOutput()
+	buf, err := rCmd.CombinedOutput()
 	if err != nil {
+		logger.Warningf("[%s] insert rule failed, out: %v, err: %v", t.table, string(buf), err)
 		return err
 	}
 	// run success, store command

@@ -41,17 +41,6 @@ func CreateProxyService() error {
 		return err
 	}
 
-	// export global proxy
-	global := newProxy(tProxy.GlobalProxy)
-	if global == nil {
-		logger.Warning("global proxy init failed")
-		return errors.New("global proxy init failed")
-	}
-	err = global.export(service)
-	if err != nil {
-		return err
-	}
-
 	// export app proxy
 	app := newProxy(tProxy.AppProxy)
 	if app == nil {
@@ -59,6 +48,17 @@ func CreateProxyService() error {
 		return errors.New("app proxy init failed")
 	}
 	err = app.export(service)
+	if err != nil {
+		return err
+	}
+
+	// export global proxy
+	global := newProxy(tProxy.GlobalProxy)
+	if global == nil {
+		logger.Warning("global proxy init failed")
+		return errors.New("global proxy init failed")
+	}
+	err = global.export(service)
 	if err != nil {
 		return err
 	}

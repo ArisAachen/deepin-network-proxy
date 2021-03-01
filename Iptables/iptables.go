@@ -23,22 +23,22 @@ var defaultChains = []string{
 }
 
 type TablesManager struct {
-	tablesMap []*TableRule
+	tableSl []*TableRule
 }
 
 // tables manager to manager table rules
 func NewTablesManager() *TablesManager {
 	// table manager
 	tableMgr := &TablesManager{
-		tablesMap: []*TableRule{},
+		tableSl: []*TableRule{},
 	}
 	// init default rules and chains
-	tableMgr.initRules()
+	tableMgr.InitRules()
 	return tableMgr
 }
 
 // init default iptables rules
-func (m *TablesManager) initRules() {
+func (m *TablesManager) InitRules() {
 	// init default tables
 	for _, table := range defaultTables {
 		// add table to table manager
@@ -98,16 +98,19 @@ func (m *TablesManager) initRules() {
 				logger.Warningf("init unknown chain [%s]", chain)
 			}
 		}
+		if tbRule != nil {
+			m.tableSl = append(m.tableSl, tbRule)
+		}
 	}
 }
 
 // create new chain,    new chain show attach to default
-func (m *TablesManager) CreateChain(table string, parent string, index int, chain string) error {
+func (m *TablesManager) CreateChain(table string, parent string, index int, chain string, base []BaseRule, extends []ExtendsRule) error {
 	// check if create default chain
 
 	// search table
 	var tbRule *TableRule
-	for _, rule := range m.tablesMap {
+	for _, rule := range m.tableSl {
 		if rule.table == table {
 			tbRule = rule
 			logger.Debugf("table [%s] found, allow to add", table)
@@ -119,7 +122,24 @@ func (m *TablesManager) CreateChain(table string, parent string, index int, chai
 		return errors.New("table dont exist")
 	}
 	// add chain to table
-	return tbRule.CreateChain(parent, index, chain)
+	return tbRule.CreateChain(parent, index, chain, base, extends)
+}
+
+// add rule
+func (m *TablesManager) AddRule(table string, chain string, action string, base []BaseRule, extends []ExtendsRule) error {
+	var tbRule *TableRule
+	for _, rule := range m.tableSl {
+		if rule.table == table {
+			logger.Debugf("table [%s] found, allow to add rule", table)
+			tbRule = rule
+			break
+		}
+	}
+	// check if table name exist
+	if tbRule == nil {
+		return errors.New("table dont exist")
+	}
+	return tbRule.AddRule(chain, action, base, extends)
 }
 
 func init() {

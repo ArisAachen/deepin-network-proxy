@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/godbus/dbus"
+	"pkg.deepin.io/lib/dbusutil"
 	"pkg.deepin.io/lib/log"
 	"sort"
 	"sync"
@@ -26,16 +27,21 @@ type CGroupManager struct {
 	// all procs message
 	// procMap map[string][]ProcMessage
 
+	sigLoop *dbusutil.SignalLoop
+
 	// lock
 	lock sync.Mutex
 }
 
 // create CGroupManager
 func NewCGroupManager() *CGroupManager {
-	return &CGroupManager{
+	// cgroup manager
+	cgMgr := &CGroupManager{
 		CGroups: []*CGroupMember{},
 		// procMap: make(map[string][]ProcMessage),
 	}
+	// loop
+	return cgMgr
 }
 
 // create cgroup path
@@ -60,7 +66,7 @@ func (c *CGroupManager) CreateCGroup(level int, elemPath string) (*CGroupMember,
 		path:     elemPath,
 		priority: level,
 		tgtExeSl: []string{},
-		procMap:  make(map[string][]ProcMessage),
+		procMap:  make(map[string][]netlink.ProcMessage),
 	}
 	// add to manager
 	c.CGroups = append(c.CGroups, member)
@@ -145,10 +151,10 @@ func (c *CGroupManager) GetCGroupProcsPath(exe string) string {
 	return cgroup.path
 }
 
-func (c *CGroupManager) getProcs() (map[string][]ProcMessage, error) {
+func (c *CGroupManager) getProcs() (map[string][]netlink.ProcMessage, error) {
 	// check if proc service is nil
 	if c.procsService == nil {
-		logger.Warning("get proc failed, proc service nit init")
+		logger.Warning("get proc failed, proc service not init")
 		return nil, errors.New("get proc failed, proc service nit init")
 	}
 	// get procs from DBus service
@@ -160,12 +166,12 @@ func (c *CGroupManager) getProcs() (map[string][]ProcMessage, error) {
 	// value map[string]ProcMessage
 
 	// temp proc message
-	temProcs := make(map[string][]ProcMessage)
+	temProcs := make(map[string][]netlink.ProcMessage)
 	for _, proc := range procs {
 		// get slice
 		procSl, ok := temProcs[proc.ExecPath]
 		if !ok {
-			procSl = []ProcMessage{}
+			procSl = []netlink.ProcMessage{}
 			temProcs[proc.ExecPath] = procSl
 		}
 		// mega add
@@ -175,7 +181,7 @@ func (c *CGroupManager) getProcs() (map[string][]ProcMessage, error) {
 			continue
 		}
 		// convert slice
-		procSl, ok = ifc.([]ProcMessage)
+		procSl, ok = ifc.([]netlink.ProcMessage)
 		if !ok {
 			logger.Warning("convert ProcMessage slice failed")
 			continue
@@ -192,9 +198,17 @@ func (c *CGroupManager) Listen() error {
 		logger.Warningf("create system bus failed, err: %v", err)
 		return err
 	}
+	// start loop
+	c.sigLoop = dbusutil.NewSignalLoop(systemBus, 10)
+	c.sigLoop.Start()
+
+	// begin listen
 	c.procsService = netlink.NewProcs(systemBus)
+	// signal ext
+	c.procsService.InitSignalExt(c.sigLoop, true)
 	// listen proc exec
 	_, err = c.procsService.ConnectExecProc(func(execPath string, cgroup2Path string, pid string) {
+		logger.Debugf("listen exec proc %s %s %s", execPath, cgroup2Path, pid)
 		// get cgroup member
 		cgroup := c.GetCGroupMember(execPath)
 		if cgroup == nil {
@@ -202,26 +216,27 @@ func (c *CGroupManager) Listen() error {
 			return
 		}
 		// make message
-		proc := ProcMessage{
-			execPath:    execPath,
-			pid:         pid,
-			cgroup2Path: cgroup2Path,
+		proc := netlink.ProcMessage{
+			ExecPath:   execPath,
+			Pid:        pid,
+			CGroupPath: cgroup2Path,
 		}
 		// add proc to cgroup
 		err = cgroup.addCrtProc(proc, true)
 	})
 	// listen proc exist
 	_, err = c.procsService.ConnectExitProc(func(execPath string, cgroup2Path string, pid string) {
+		logger.Debugf("listen exit proc %s %s %s", execPath, cgroup2Path, pid)
 		// get cgroup member
 		cgroup := c.GetCGroupMember(execPath)
 		if cgroup == nil {
 			logger.Debugf("exe [%s] cant found in any cgroup", execPath)
 			return
 		}
-		proc := ProcMessage{
-			execPath:    execPath,
-			pid:         pid,
-			cgroup2Path: cgroup2Path,
+		proc := netlink.ProcMessage{
+			ExecPath:   execPath,
+			Pid:        pid,
+			CGroupPath: cgroup2Path,
 		}
 		// kernel delete proc
 		err = cgroup.delCrtProc(proc, false)

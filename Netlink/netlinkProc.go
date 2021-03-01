@@ -21,9 +21,9 @@ var logger *log.Logger
 
 // proc message
 type ProcMessage struct {
-	execPath    string // exe path
-	cgroup2Path string // mark cgroup v2 path
-	pid         string // pid
+	ExecPath    string // exe path
+	Cgroup2Path string // mark cgroup v2 path
+	Pid         string // Pid
 }
 
 // Manager all procs
@@ -31,8 +31,12 @@ type ProcManager struct {
 	// current all proc
 	Procs map[string]ProcMessage
 
+	Test string
+
 	// lock
 	lock sync.Mutex
+
+	service *dbusutil.Service
 
 	// net_link module
 	sock  int
@@ -41,14 +45,24 @@ type ProcManager struct {
 
 	// signals
 	signals *struct {
-		ExecProc ProcMessage
-		ExitProc ProcMessage
+		ExecProc struct {
+			execPath    string // exe path
+			cgroup2Path string // mark cgroup v2 path
+			pid         string // Pid
+		}
+		ExitProc struct {
+			execPath    string // exe path
+			cgroup2Path string // mark cgroup v2 path
+			pid         string // Pid
+		}
 	}
 }
 
-func NewProcManager() *ProcManager {
+func NewProcManager(service *dbusutil.Service) *ProcManager {
 	return &ProcManager{
-		Procs: make(map[string]ProcMessage),
+		Test:    "test",
+		service: service,
+		Procs:   make(map[string]ProcMessage),
 	}
 }
 
@@ -147,12 +161,12 @@ func (p *ProcManager) loadProc() error {
 		logger.Warningf("read [%s] failed, err: %v", ProcDir, err)
 		return err
 	}
-	// select proc pid from /proc
+	// select proc Pid from /proc
 	for _, info := range dirsInfo {
 		// get proc message
 		msg, err := getProcMsg(info.Name())
 		if err != nil {
-			logger.Debugf("get pid message failed, err: %v", err)
+			logger.Debugf("get Pid message failed, err: %v", err)
 			continue
 		}
 		// store process message
@@ -208,15 +222,15 @@ func (p *ProcManager) listen() error {
 				logger.Warningf("binary read ProcEventHeader failed, err: %v", err)
 				continue
 			}
-			// pid equal Tgid means new proc is exec
+			// Pid equal Tgid means new proc is exec
 			if event.ProcPid == event.ProcTGid {
 				pid := strconv.Itoa(int(event.ProcPid))
 				msg, err := getProcMsg(pid)
 				if err != nil {
-					logger.Debugf("pid [%s] dont include exec path", pid)
+					logger.Debugf("Pid [%s] dont include exec path", pid)
 					continue
 				}
-				logger.Debugf("add proc exec, pid [%s] exe [%s]", pid, msg.execPath)
+				logger.Debugf("add proc exec, Pid [%s] exe [%s]", pid, msg.ExecPath)
 				p.addProc(pid, msg)
 			}
 		// proc exit
@@ -228,12 +242,12 @@ func (p *ProcManager) listen() error {
 				logger.Warningf("binary read ProcEventHeader failed, err: %v", err)
 				continue
 			}
-			// pid equal Tgid means new proc is exec,
+			// Pid equal Tgid means new proc is exec,
 			// when exit, this is exactly right, when pthread_cancel or pthread_exit is called in main thread,
 			// this result is not correct, but seldom program in this way
 			if event.ProcessPid == event.ProcessTgid {
 				pid := strconv.Itoa(int(event.ProcessPid))
-				logger.Debugf("del proc exec, pid [%s]", pid)
+				logger.Debugf("del proc exec, Pid [%s]", pid)
 				p.delProc(pid)
 			}
 		default:
@@ -247,15 +261,32 @@ func (p *ProcManager) listen() error {
 // add proc
 func (p *ProcManager) addProc(pid string, msg ProcMessage) {
 	p.lock.Lock()
-	defer p.lock.Unlock()
 	p.Procs[pid] = msg
+	p.lock.Unlock()
+
+	logger.Debugf("current exec proc %v", msg)
+	err := p.service.Emit(p, "ExecProc", msg.ExecPath, msg.Cgroup2Path, msg.Pid)
+	if err != nil {
+		logger.Warningf("emit %v ExecProc failed, err: %v", msg, err)
+		return
+	}
 }
 
 // del proc
 func (p *ProcManager) delProc(pid string) {
 	p.lock.Lock()
-	defer p.lock.Unlock()
+	msg, ok := p.Procs[pid]
 	delete(p.Procs, pid)
+	p.lock.Unlock()
+
+	if ok {
+		logger.Debugf("current exit proc %v", msg)
+		err := p.service.Emit(p, "ExitProc", msg.ExecPath, msg.Cgroup2Path, msg.Pid)
+		if err != nil {
+			logger.Warningf("emit %v ExitProc failed, err: %v", msg, err)
+			return
+		}
+	}
 }
 
 func CreateProcsService() error {
@@ -265,7 +296,7 @@ func CreateProcsService() error {
 		logger.Warningf("get system bus failed, err: %v", err)
 		return err
 	}
-	manager := NewProcManager()
+	manager := NewProcManager(service)
 	// init sock
 	err = manager.initSock()
 	if err != nil {
@@ -307,6 +338,8 @@ func CreateProcsService() error {
 		logger.Warningf("request [%s] failed, err: %v", BusServiceName, err)
 		return err
 	}
+
+	service.Wait()
 
 	return nil
 }

@@ -1,6 +1,8 @@
 package Com
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -425,7 +427,7 @@ func MegaAdd(src interface{}, tgt interface{}) (interface{}, bool, error) {
 		}
 		// append to last
 		result := reflect.Append(values, reflect.ValueOf(tgt))
-		return result, true, nil
+		return result.Interface(), true, nil
 	}
 	return nil, false, nil
 }
@@ -459,7 +461,7 @@ func MegaInsert(src interface{}, tgt interface{}, index int) (interface{}, bool,
 		// insert the central or beginning
 		back := values.Slice(index, values.Len())
 		result = reflect.AppendSlice(result, back)
-		return result, true, nil
+		return result.Interface(), true, nil
 	}
 	return nil, false, nil
 }
@@ -501,7 +503,7 @@ func MegaDel(src interface{}, tgt interface{}) (interface{}, bool, error) {
 		// if not the last elem, including the first one
 		back := values.Slice(index+1, values.Len())
 		result := reflect.AppendSlice(front, back)
-		return result, true, nil
+		return result.Interface(), true, nil
 	}
 	return nil, false, nil
 }
@@ -511,4 +513,23 @@ var pidRegexp = regexp.MustCompile("^[0-9]*[1-9][0-9]*$")
 
 func IsPid(pid string) bool {
 	return pidRegexp.MatchString(pid)
+}
+
+// parse cgroup v2 message from /proc/pid/cgroup
+func ParseCGroup2FromBuf(in []byte) []byte {
+	byt := bytes.NewBuffer(in)
+	reader := bufio.NewReader(byt)
+
+	for {
+		// read line
+		buf, _, err := reader.ReadLine()
+		// dont care about if error if EOF
+		if err != nil {
+			return nil
+		}
+		// cgroup v2 message
+		if bytes.HasPrefix(buf, []byte("0:")) {
+			return bytes.TrimPrefix(buf, []byte("0:"))
+		}
+	}
 }

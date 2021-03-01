@@ -4,6 +4,7 @@ const (
 	ProcDir = "/proc"
 	exe     = "exe"
 	cwd     = "cwd"
+	cgroup  = "cgroup"
 	autoPid = 0
 )
 

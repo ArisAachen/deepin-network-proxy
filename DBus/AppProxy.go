@@ -2,12 +2,13 @@ package DBus
 
 import (
 	"fmt"
-
 	cgroup "github.com/DeepinProxy/CGroups"
 	config "github.com/DeepinProxy/Config"
+	iptables "github.com/DeepinProxy/Iptables"
 	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
 	"pkg.deepin.io/lib/dbusutil"
+	"strconv"
 )
 
 type AppProxy struct {
@@ -45,6 +46,8 @@ func NewAppProxy() *AppProxy {
 	_ = appModule.initCGroup()
 	apps := appModule.Proxies.ProxyProgram
 	appModule.addCGroupExes(apps)
+
+	_ = appModule.initIptables()
 
 	return appModule
 }
@@ -91,6 +94,88 @@ func (mgr *AppProxy) initCGroup() error {
 	}
 	mgr.cgroupMember = member
 	logger.Debugf("[%s] create cgroup success", mgr.scope)
+	return nil
+}
+
+func (mgr *AppProxy) initIptables() error {
+	// init global iptables
+	err := mgr.proxyPrv.initIptables()
+	if err != nil {
+		logger.Warningf("[%s] init global iptables failed, err: %v", err)
+		return err
+	}
+	extends := []iptables.ExtendsRule{
+		iptables.ExtendsRule{
+			Match: "m",
+			Base: []iptables.ExtendsElem{
+				{
+					Match: "cgroup",
+					Base: []iptables.BaseRule{
+						{
+							Match: "path",
+							Param: mgr.cgroupMember.GetCGroupPath(),
+						},
+					},
+				},
+			},
+		},
+	}
+	err = allIptables.CreateChain("mangle", "OUTPUT", cgroup.AppProxyLevel-1, "App", nil, extends)
+	if err != nil {
+		logger.Warningf("[%s] create chain failed, err: %v", err)
+		return err
+	}
+	// -t mangle -I OUTPUT -p tcp -j MARK -j MARK --set-mark 8090
+	bs := []iptables.BaseRule{
+		{
+			Match: "-set-mark",
+			Param: strconv.Itoa(mgr.Proxies.TPort),
+		},
+		{
+			Match: "p",
+			Param: "tcp",
+		},
+	}
+	// add mark
+	err = allIptables.AddRule("mangle", "App", iptables.MARK, bs, nil)
+	if err != nil {
+		logger.Warningf("[%s] add OUTPUT rule failed, err: %v", mgr.scope, err)
+		return err
+	}
+	logger.Debugf("[%s] add mark success", mgr.scope)
+
+	extends = []iptables.ExtendsRule{
+		iptables.ExtendsRule{
+			Match: "m",
+			Base: []iptables.ExtendsElem{
+				{
+					Match: "mark",
+					Base: []iptables.BaseRule{
+						{
+							Match: "mark",
+							Param: strconv.Itoa(mgr.Proxies.TPort),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	bs = []iptables.BaseRule{
+		{
+			Match: "p",
+			Param: "tcp",
+		},
+		{
+			Match: "-on-port",
+			Param: strconv.Itoa(mgr.Proxies.TPort),
+		},
+	}
+	// transparent mark
+	err = allIptables.AddRule("mangle", "PREROUTING", iptables.TPROXY, bs, extends)
+	if err != nil {
+		logger.Warningf("[%s] add transparent rule failed, err: %v", mgr.scope, err)
+	}
 	return nil
 }
 

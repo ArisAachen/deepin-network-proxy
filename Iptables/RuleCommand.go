@@ -22,13 +22,12 @@ type RuleCommand struct {
 func (r *RuleCommand) CombinedOutput() ([]byte, error) {
 	// param
 	param := strings.Join(r.StringSl(), " ")
-	cmd := exec.Command("/bin/bash", "-c", r.soft, param)
+	cmd := exec.Command("/bin/bash", "-c", r.soft+" "+param)
 	logger.Debugf("run command %s", cmd.String())
 	return cmd.CombinedOutput()
 }
 
 //
-
 
 // make string
 func (r *RuleCommand) StringSl() []string {

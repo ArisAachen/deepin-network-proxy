@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	com "github.com/DeepinProxy/Com"
+	netlink "github.com/linuxdeepin/go-dbus-factory/com.deepin.system.procs"
 )
 
 const (
@@ -34,12 +35,12 @@ const (
 	GlobalProxyLevel
 )
 
-// proc message
-type ProcMessage struct {
-	execPath    string // exe path
-	cgroup2Path string // mark origin cgroup v2 path
-	pid         string // pid
-}
+//// proc message
+//type ProcMessage struct {
+//	ExecPath   string // exe path
+//	CGroupPath string // mark origin cgroup v2 path
+//	Pid        string // pid
+//}
 
 // cgroup
 type CGroupMember struct {
@@ -59,13 +60,13 @@ type CGroupMember struct {
 	tgtExeSl []string //
 
 	// current process map,  [/usr/sbin/NetworkManager][1 12256]
-	procMap map[string][]ProcMessage
+	procMap map[string][]netlink.ProcMessage
 }
 
 func newGrpMsg() *CGroupMember {
 	return &CGroupMember{
 		tgtExeSl: []string{},
-		procMap:  make(map[string][]ProcMessage),
+		procMap:  make(map[string][]netlink.ProcMessage),
 	}
 }
 
@@ -77,6 +78,10 @@ func (p *CGroupMember) getProcsPath() string {
 
 func (p *CGroupMember) getProcsDir() string {
 	return filepath.Join(cgroup2Path, p.path+suffix)
+}
+
+func (c *CGroupMember) GetCGroupPath() string {
+	return c.path + suffix
 }
 
 // add module exec paths
@@ -200,12 +205,12 @@ func (p *CGroupMember) existTgtExe(exePath string) bool {
 }
 
 // add proc to cgroup
-func (p *CGroupMember) addCrtProc(proc ProcMessage, active bool) error {
+func (p *CGroupMember) addCrtProc(proc netlink.ProcMessage, active bool) error {
 	// check if key exist, if not , add key
-	procSl, ok := p.procMap[proc.execPath]
+	procSl, ok := p.procMap[proc.ExecPath]
 	if !ok {
-		logger.Debugf("[%s] add crtProc dont include exe [%s]", p.path, proc.execPath)
-		procSl = []ProcMessage{}
+		logger.Debugf("[%s] add crtProc dont include exe [%s]", p.path, proc.ExecPath)
+		procSl = []netlink.ProcMessage{}
 	}
 	// try to add
 	ifc, update, err := com.MegaAdd(procSl, proc)
@@ -219,15 +224,15 @@ func (p *CGroupMember) addCrtProc(proc ProcMessage, active bool) error {
 		return nil
 	}
 	// check if type correct
-	procSl, ok = ifc.([]ProcMessage)
+	procSl, ok = ifc.([]netlink.ProcMessage)
 	if !ok {
 		logger.Warningf("[%s] add crtProc [%v] failed, ifc is ProcMessage slice", p.path, proc)
 		return errors.New("ifc is not match")
 	}
 	// add pid to sl
-	p.procMap[proc.execPath] = procSl
+	p.procMap[proc.ExecPath] = procSl
 	if active {
-		err = AttachCGroup(proc.pid, p.getProcsPath())
+		err = AttachCGroup(p.getProcsPath(), proc.Pid)
 	}
 	return nil
 }
@@ -246,11 +251,11 @@ func (p *CGroupMember) delCrtProcs(exe string, active bool) error {
 }
 
 // del proc from cgroup
-func (p *CGroupMember) delCrtProc(proc ProcMessage, active bool) error {
+func (p *CGroupMember) delCrtProc(proc netlink.ProcMessage, active bool) error {
 	// check if key exist, if not , add key
-	procSl, ok := p.procMap[proc.execPath]
+	procSl, ok := p.procMap[proc.ExecPath]
 	if !ok {
-		logger.Debugf("[%s] delete crtProc dont include exe [%s]", p.path, proc.execPath)
+		logger.Debugf("[%s] delete crtProc dont include exe [%s]", p.path, proc.ExecPath)
 		return nil
 	}
 	// try to add
@@ -265,29 +270,29 @@ func (p *CGroupMember) delCrtProc(proc ProcMessage, active bool) error {
 		return nil
 	}
 	// check if type correct
-	procSl, ok = ifc.([]ProcMessage)
+	procSl, ok = ifc.([]netlink.ProcMessage)
 	if !ok {
 		logger.Warningf("[%s] delete crtProc [%v] failed, ifc is ProcMessage slice", p.path, proc)
 		return errors.New("ifc is not match")
 	}
 	// add pid to sl
-	p.procMap[proc.execPath] = procSl
+	p.procMap[proc.ExecPath] = procSl
 	// attach pid to origin cgroup
 	if active {
-		err = AttachCGroup(proc.cgroup2Path, proc.pid)
+		err = AttachCGroup(proc.CGroupPath, proc.Pid)
 	}
 	return nil
 }
 
 // find pid and return index
-func (p *CGroupMember) existProc(proc ProcMessage) bool {
+func (p *CGroupMember) existProc(proc netlink.ProcMessage) bool {
 	// check if length is 0
 	if len(p.procMap) == 0 {
 		logger.Debugf("[%s] check proc [%v] not exist, map length is 0", p.path, proc)
 		return false
 	}
 	// proc slice
-	procSl, ok := p.procMap[proc.execPath]
+	procSl, ok := p.procMap[proc.ExecPath]
 	if !ok {
 		logger.Debugf("[%s] check proc [%v] not exist, slice length is 0", p.path, proc)
 		return false

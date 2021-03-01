@@ -8,19 +8,19 @@ import (
 func TestRuleCommand_CombinedOutput(t *testing.T) {
 	contain := containRule{
 		action: ACCEPT,
-		bsRules: []baseRule{
+		bsRules: []BaseRule{
 			{
 				match: "s",
 				param: "10.20.31.189",
 			},
 		},
-		exRules: []extendsRule{
+		exRules: []ExtendsRule{
 			{
 				match: "m",
-				base: []extendsElem{
+				base: []ExtendsElem{
 					{
 						match: "mark",
-						base: []baseRule{
+						base: []BaseRule{
 							{
 								match: "mark",
 								param: "1",

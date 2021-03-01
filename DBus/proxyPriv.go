@@ -9,6 +9,7 @@ import (
 	cgroup "github.com/DeepinProxy/CGroups"
 	com "github.com/DeepinProxy/Com"
 	config "github.com/DeepinProxy/Config"
+	iptables "github.com/DeepinProxy/Iptables"
 	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
 	"pkg.deepin.io/lib/dbusutil"
@@ -24,6 +25,10 @@ var onceCfg sync.Once
 // use to int cgroup v2
 var allCGroups *cgroup.CGroupManager
 var onceCgp sync.Once
+
+// use to init iptables manager
+var allIptables *iptables.TablesManager
+var onceTb sync.Once
 
 const (
 	BusServiceName = "com.deepin.session.proxy"
@@ -49,6 +54,9 @@ type proxyPrv struct {
 
 	// proxyMember to organize cgroup v2
 	cgroupMember *cgroup.CGroupMember
+
+	// iptables to manager iptables
+	// iptablesMember map[string][]*iptables.ChainRule
 
 	// handler manager
 	handlerMgr *tProxy.HandlerMgr
@@ -144,6 +152,36 @@ func (mgr *proxyPrv) initCGroup() error {
 		}
 	})
 	return err
+}
+
+// init iptables, may include read origin iptables later
+func (mgr *proxyPrv) initIptables() error {
+	onceTb.Do(func() {
+		// init all iptables
+		allIptables = iptables.NewTablesManager()
+		// init default iptables
+		extends := []iptables.ExtendsRule{
+			iptables.ExtendsRule{
+				Match: "m",
+				Base: []iptables.ExtendsElem{
+					{
+						Match: "cgroup",
+						Base: []iptables.BaseRule{
+							{
+								Match: "path",
+								Param: cgroup.MainGRP + ".slice",
+							},
+						},
+					},
+				},
+			},
+		}
+		err := allIptables.AddRule("mangle", "OUTPUT", iptables.RETURN, nil, extends)
+		if err != nil {
+			logger.Warningf("[%s] create chain failed, err: %v", mgr.scope, err)
+		}
+	})
+	return nil
 }
 
 // add cgroup proc

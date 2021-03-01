@@ -1,190 +1,103 @@
-all-proxy:
+all-proxies:
   app:
-    http:
-    - prototype: http
-      name: http_1
-      server: 10.20.31.132
-      port: 808
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-    - prototype: http
-      name: http_2
-      server: 10.20.31.132
-      port: 80
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-    sock4:
-    - prototype: sock4
-      name: sock4_1
-      server: 10.20.31.132
-      port: 1080
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-    - prototype: sock4
-      name: sock4_2
-      server: 10.20.31.132
-      port: 1080
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-    sock5:
-    - prototype: sock5
-      name: sock5_1
-      server: 10.20.31.132
-      port: 1080
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-    - prototype: sock5
-      name: sock5_2
-      server: 10.20.31.132
-      port: 1080
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
+    proxies:
+      http:
+      - prototype: http
+        name: http_1
+        server: 10.20.31.132
+        port: 808
+        username: uos
+        password: "12345678"
+      - prototype: http
+        name: http_2
+        server: 10.20.31.132
+        port: 80
+        username: uos
+        password: "12345678"
+      sock4:
+      - prototype: sock4
+        name: sock4_1
+        server: 10.20.31.132
+        port: 1080
+        username: uos
+        password: "12345678"
+      - prototype: sock4
+        name: sock4_2
+        server: 10.20.31.132
+        port: 1080
+        username: uos
+        password: "12345678"
+      sock5:
+      - prototype: sock5
+        name: sock5_1
+        server: 10.20.31.132
+        port: 1080
+        username: uos
+        password: "12345678"
+      - prototype: sock5
+        name: sock5_2
+        server: 10.20.31.132
+        port: 1080
+        username: uos
+        password: "12345678"
+    proxy-program:
+    - apt
+    - ssr
+    no-proxy-program:
+    - apt
+    - ssr
+    whitelist:
+    - baidu.com
+    - si.com
+    t-port: 8090
   global:
-    http:
-    - prototype: http
-      name: http_1
-      server: 10.20.31.132
-      port: 808
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-    - prototype: http
-      name: http_2
-      server: 10.20.31.132
-      port: 80
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-    sock4:
-    - prototype: sock4
-      name: sock4_1
-      server: 10.20.31.132
-      port: 1080
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-    - prototype: sock4
-      name: sock4_2
-      server: 10.20.31.132
-      port: 1080
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-    sock5:
-    - prototype: sock5
-      name: sock5_1
-      server: 10.20.31.132
-      port: 1080
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-    - prototype: sock5
-      name: sock5_2
-      server: 10.20.31.132
-      port: 1080
-      username: uos
-      password: "12345678"
-      proxy-program:
-      - apt
-      - ssr
-      no-proxy-program:
-      - apt
-      - ssr
-      whitelist:
-      - baidu.com
-      - si.com
-t-port: 8080
+    proxies:
+      http:
+      - prototype: http
+        name: http_1
+        server: 10.20.31.132
+        port: 808
+        username: uos
+        password: "12345678"
+      - prototype: http
+        name: http_2
+        server: 10.20.31.132
+        port: 80
+        username: uos
+        password: "12345678"
+      sock4:
+      - prototype: sock4
+        name: sock4_1
+        server: 10.20.31.132
+        port: 1080
+        username: uos
+        password: "12345678"
+      - prototype: sock4
+        name: sock4_2
+        server: 10.20.31.132
+        port: 1080
+        username: uos
+        password: "12345678"
+      sock5:
+      - prototype: sock5
+        name: sock5_1
+        server: 10.20.31.177
+        port: 1080
+        username: uos
+        password: "12345678"
+      - prototype: sock5
+        name: sock5_2
+        server: 10.20.31.132
+        port: 1080
+        username: uos
+        password: "12345678"
+    proxy-program:
+    - apt
+    - ssr
+    no-proxy-program:
+    - apt
+    - ssr
+    whitelist:
+    - baidu.com
+    - si.com
+    t-port: 8080
