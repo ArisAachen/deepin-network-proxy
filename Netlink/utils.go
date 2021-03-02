@@ -4,7 +4,9 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	com "github.com/DeepinProxy/Com"
 )
@@ -34,4 +36,22 @@ func getProcMsg(pid string) (ProcMessage, error) {
 		Pid:         pid,
 	}
 	return msg, nil
+}
+
+func getCPUTime() {
+
+}
+
+// use to attach pid to cgroup
+func AttachCGroup(pid string, path string) error {
+	args := []string{"echo", pid, ">", path}
+	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
+	logger.Debugf("start to attach cgroup %s", cmd.String())
+	buf, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Warningf("exec add cgroup failed, err: %v", err)
+		return err
+	}
+	logger.Debugf("result is %s", string(buf))
+	return nil
 }

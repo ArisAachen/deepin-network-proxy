@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io/ioutil"
-	"pkg.deepin.io/lib/dbusutil"
 	"strconv"
 	"sync"
 	"syscall"
 
+	com "github.com/DeepinProxy/Com"
+	"github.com/godbus/dbus"
+	"pkg.deepin.io/lib/dbusutil"
 	"pkg.deepin.io/lib/log"
 )
 
@@ -31,8 +34,6 @@ type ProcManager struct {
 	// current all proc
 	Procs map[string]ProcMessage
 
-	Test string
-
 	// lock
 	lock sync.Mutex
 
@@ -42,6 +43,10 @@ type ProcManager struct {
 	sock  int
 	lAddr syscall.Sockaddr
 	kAddr syscall.Sockaddr
+
+	methods *struct {
+		ChangeCGroup func() `in:"pid,cgroup" out:"err"`
+	}
 
 	// signals
 	signals *struct {
@@ -60,7 +65,6 @@ type ProcManager struct {
 
 func NewProcManager(service *dbusutil.Service) *ProcManager {
 	return &ProcManager{
-		Test:    "test",
 		service: service,
 		Procs:   make(map[string]ProcMessage),
 	}
@@ -68,6 +72,28 @@ func NewProcManager(service *dbusutil.Service) *ProcManager {
 
 func (p *ProcManager) GetInterfaceName() string {
 	return BusInterface
+}
+
+// change cgroup
+func (p *ProcManager) ChangeCGroup(pid string, cgroup string) *dbus.Error {
+	logger.Debugf("start to attach pid [%s] to cgroup [%s]", pid, cgroup)
+	// check if pid is num
+	if !com.IsPid(pid) {
+		logger.Warning("change cgroup pid is not num")
+		return dbusutil.ToError(errors.New("pid is not num"))
+	}
+	// try to get proc message
+	msg := p.getProc(pid)
+	if msg == nil {
+		logger.Warningf("pid [%s] not exist or has no exe path", pid)
+		return dbusutil.ToError(fmt.Errorf("pid [%s] not exist or has no exe path", pid))
+	}
+	err := AttachCGroup(pid, cgroup)
+	if err != nil {
+		logger.Warningf("attach pid [%s] to cgroup [%s] failed, err: %v", pid, cgroup, err)
+	}
+	logger.Debugf("attach pid [%s] to cgroup [%s] success", pid, cgroup)
+	return nil
 }
 
 // init sock
@@ -270,6 +296,14 @@ func (p *ProcManager) addProc(pid string, msg ProcMessage) {
 		logger.Warningf("emit %v ExecProc failed, err: %v", msg, err)
 		return
 	}
+}
+
+// get proc
+func (p *ProcManager) getProc(pid string) *ProcMessage {
+	p.lock.Lock()
+	msg := p.Procs[pid]
+	p.lock.Unlock()
+	return &msg
 }
 
 // del proc

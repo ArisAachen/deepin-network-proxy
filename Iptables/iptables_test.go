@@ -10,20 +10,20 @@ func TestRuleCommand_CombinedOutput(t *testing.T) {
 		action: ACCEPT,
 		bsRules: []BaseRule{
 			{
-				match: "s",
-				param: "10.20.31.189",
+				Match: "s",
+				Param: "10.20.31.189",
 			},
 		},
 		exRules: []ExtendsRule{
 			{
-				match: "m",
-				base: []ExtendsElem{
+				Match: "m",
+				Base: []ExtendsElem{
 					{
-						match: "mark",
-						base: []BaseRule{
+						Match: "mark",
+						Base: []BaseRule{
 							{
-								match: "mark",
-								param: "1",
+								Match: "mark",
+								Param: "1",
 							},
 						},
 					},

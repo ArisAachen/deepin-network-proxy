@@ -508,6 +508,33 @@ func MegaDel(src interface{}, tgt interface{}) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
+// check if target exist in slice
+func MegaExist(src interface{}, tgt interface{}) bool {
+	// check kind, only map and slice support mega exist
+	srcTyp := reflect.TypeOf(src)
+	if srcTyp.Kind() != reflect.Slice && srcTyp.Kind() != reflect.Map {
+		return false
+	}
+	// check if elem type is the same with target
+	if srcTyp.Elem() != reflect.TypeOf(tgt) {
+		return false
+	}
+	// if kind is slice
+	if srcTyp.Kind() == reflect.Slice {
+		values := reflect.ValueOf(src)
+		// search
+		for index := 0; index < values.Len(); index++ {
+			// convert index to interface
+			cmpValue := values.Index(index).Interface()
+			// check if elem equal with target
+			if reflect.DeepEqual(cmpValue, tgt) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // pid must be num
 var pidRegexp = regexp.MustCompile("^[0-9]*[1-9][0-9]*$")
 
