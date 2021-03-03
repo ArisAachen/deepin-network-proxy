@@ -3,15 +3,14 @@ package DBus
 import (
 	"net"
 	"os"
-	"os/exec"
 	"strconv"
-	"strings"
 	"sync"
 
 	cgroup "github.com/DeepinProxy/CGroups"
 	com "github.com/DeepinProxy/Com"
 	config "github.com/DeepinProxy/Config"
 	iptables "github.com/DeepinProxy/Iptables"
+	newIptables "github.com/DeepinProxy/NewIptables"
 	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
 	"pkg.deepin.io/lib/dbusutil"
@@ -31,6 +30,10 @@ var onceCgp sync.Once
 // use to init iptables manager
 var allIptables *iptables.TablesManager
 var onceTb sync.Once
+
+// use to init iptables manager
+var allNewIptables *newIptables.Manager
+var onceNewTb *sync.Once
 
 const (
 	BusServiceName = "com.deepin.session.proxy"
@@ -57,8 +60,10 @@ type proxyPrv struct {
 	// proxyMember to organize cgroup v2
 	cgroupMember *cgroup.CGroupMember
 
-	// iptables to manager iptables
-	// iptablesMember map[string][]*iptables.ChainRule
+	// iptables chain rule slice[2]
+	chains [2]*newIptables.Chain
+	// to store self added
+	cplSl  []*newIptables.CompleteRule
 
 	// handler manager
 	handlerMgr *tProxy.HandlerMgr
@@ -153,47 +158,8 @@ func (mgr *proxyPrv) initCGroup() error {
 			return
 		}
 	})
-	return err
-}
 
-// init iptables, may include read origin iptables later
-func (mgr *proxyPrv) initIptables() error {
-	onceTb.Do(func() {
-		// init all iptables
-		allIptables = iptables.NewTablesManager()
-		// init default iptables
-		extends := []iptables.ExtendsRule{
-			iptables.ExtendsRule{
-				Match: "m",
-				Base: []iptables.ExtendsElem{
-					{
-						Match: "cgroup",
-						Base: []iptables.BaseRule{
-							{
-								Match: "path",
-								Param: cgroup.MainGRP + ".slice",
-							},
-						},
-					},
-				},
-			},
-		}
-		err := allIptables.AddRule("mangle", "OUTPUT", iptables.RETURN, nil, extends)
-		if err != nil {
-			logger.Warningf("[%s] create chain failed, err: %v", mgr.scope, err)
-		}
-		logger.Debugf("[%s] add default chain success", mgr.scope)
-		// add new local table
-		args := []string{"ip route", "add", "local default", "dev lo", "table 100"}
-		cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
-		logger.Debugf("[%s] start to add rule: %s", mgr.scope, cmd.String())
-		buf, err := cmd.CombinedOutput()
-		if err != nil {
-			logger.Warningf("[%s] run ip route failed, out: %s, err: %v", mgr.scope, string(buf), err)
-		}
-		logger.Debugf("[%s] add ip route success", mgr.scope)
-	})
-	return nil
+	return err
 }
 
 // add cgroup proc

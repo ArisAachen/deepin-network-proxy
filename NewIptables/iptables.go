@@ -21,7 +21,7 @@ func (t *Table) runCommand(operation Operation, chain *Chain, index int, cpl *Co
 	// run command
 	args := []string{"iptables", "-t", t.Name, operation.ToString(), chain.Name}
 	// add index
-	if index != 0 {
+	if index != 0 && operation == Insert {
 		args = append(args, strconv.Itoa(index))
 	}
 	// add one complete rule
@@ -111,6 +111,24 @@ func (c *Chain) GetRulesCount() int {
 	return len(c.cplRuleSl)
 }
 
+// current children chain
+func (c *Chain) GetChildrenCount() int {
+	return len(c.children)
+}
+
+// current create child index
+func (c *Chain) GetCreateChildIndex(name string) (int, bool) {
+	// search all rule
+	for index, rule := range c.cplRuleSl {
+		if strings.Contains(rule.String(), strings.Join([]string{"-j", name}, " ")) {
+			logger.Debugf("[%s] chain %s has child %s in %v", c.table.Name, c.Name, name, index)
+			return index, true
+		}
+	}
+	logger.Debugf("[%s] chain %s has not child %s", c.table.Name, c.Name, name)
+	return 0, false
+}
+
 // remove self
 func (c *Chain) Remove() error {
 	// delete self from parent first
@@ -168,26 +186,31 @@ func (c *Chain) DelChild(child *Chain) error {
 		return nil
 	}
 	logger.Debugf("[%s] chain %s has child %s, begin to delete", c.table.Name, c.Name, child.Name)
-	// find create table command
-	for _, cpl := range c.cplRuleSl {
-		line := cpl.String()
-		// check if contains -j child.Name
-		if strings.Contains(line, strings.Join([]string{"-j", child.Name}, " ")) {
-			// del rule
-			err := c.DelRule(cpl)
-			if err != nil {
-				return err
-			}
-			logger.Debugf("[%s] chain %s delete child %s success", c.table.Name, c.Name, child.Name)
-			delete(c.children, childName)
-		}
+	if index, exist := c.GetCreateChildIndex(child.Name); exist {
+		return c.DelIndexRule(index)
 	}
 	return nil
 }
 
 // add rule
-func (c *Chain) AddRule(operation Operation, cpl *CompleteRule) error {
-	return c.InsertRule(operation, 0, cpl)
+func (c *Chain) AddRule(cpl *CompleteRule) error {
+	return c.InsertRule(Insert, 0, cpl)
+}
+
+// append rule at last
+func (c *Chain) AppendRule(cpl *CompleteRule) error {
+	// check if already exist
+	if c.ExistRule(cpl) {
+		return nil
+	}
+	// clear self chain
+	err := c.table.runCommand(Append, c, 0, cpl)
+	if err != nil {
+		logger.Warningf("[%s] chain %s flush failed", c.table.Name, c.Name, err)
+		return err
+	}
+	c.cplRuleSl = append(c.cplRuleSl, cpl)
+	return nil
 }
 
 // insert rule
@@ -201,7 +224,7 @@ func (c *Chain) InsertRule(operation Operation, index int, cpl *CompleteRule) er
 		return nil
 	}
 	// clear self chain
-	err := c.table.runCommand(operation, c, index, cpl)
+	err := c.table.runCommand(operation, c, index+1, cpl)
 	if err != nil {
 		logger.Warningf("[%s] chain %s flush failed", c.table.Name, c.Name, err)
 		return err
@@ -262,4 +285,22 @@ func (c *Chain) DelRule(cpl *CompleteRule) error {
 	}
 	c.cplRuleSl = temp
 	return nil
+}
+
+// get rule index
+func (c *Chain) GetIndexRule(index int) *CompleteRule {
+	if index >= len(c.cplRuleSl) {
+		return nil
+	}
+	return c.cplRuleSl[index]
+}
+
+// del rule index
+func (c *Chain) DelIndexRule(index int) error {
+	rule := c.GetIndexRule(index)
+	if rule == nil {
+		return errors.New("index invalid")
+	}
+	err := c.DelRule(rule)
+	return err
 }

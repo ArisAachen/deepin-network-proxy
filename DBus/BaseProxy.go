@@ -29,6 +29,10 @@ type BaseProxy interface {
 	addCGroupExes(procs []string)
 	delCGroupExes(procs []string)
 
+	// iptables
+	appendRule() error
+	releaseRule() error
+
 	// export DBus service
 	export(service *dbusutil.Service) error
 }

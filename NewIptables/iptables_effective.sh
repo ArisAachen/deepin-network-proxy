@@ -27,6 +27,7 @@ start_app() {
   iptables -t mangle -N App_Proxy
   iptables -t mangle -I All_Entry $1 -p tcp -m cgroup --path app.slice -j App_Proxy
   iptables -t mangle -A App_Proxy -j MARK --set-mark $2
+  iptables -t mangle -A PREROUTING -j TPROXY -m mark --mark $2
 }
 
 ## create global proxy chain, use to global proxy

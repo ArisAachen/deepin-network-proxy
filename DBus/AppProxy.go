@@ -4,13 +4,10 @@ import (
 	"fmt"
 	cgroup "github.com/DeepinProxy/CGroups"
 	config "github.com/DeepinProxy/Config"
-	iptables "github.com/DeepinProxy/Iptables"
+	newIptables "github.com/DeepinProxy/NewIptables"
 	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
-	"os/exec"
 	"pkg.deepin.io/lib/dbusutil"
-	"strconv"
-	"strings"
 )
 
 type AppProxy struct {
@@ -49,7 +46,8 @@ func NewAppProxy() *AppProxy {
 	apps := appModule.Proxies.ProxyProgram
 	appModule.addCGroupExes(apps)
 
-	_ = appModule.initIptables()
+	// init iptables
+	appModule.createTable()
 
 	return appModule
 }
@@ -99,98 +97,52 @@ func (mgr *AppProxy) initCGroup() error {
 	return nil
 }
 
-func (mgr *AppProxy) initIptables() error {
-	// init global iptables
-	err := mgr.proxyPrv.initIptables()
+// init new iptables
+func (mgr *AppProxy) createTable() {
+	err := mgr.proxyPrv.initNewIptables()
 	if err != nil {
-		logger.Warningf("[%s] init global iptables failed, err: %v", err)
-		return err
+		return
 	}
-	// create app chain
-	extends := []iptables.ExtendsRule{
-		iptables.ExtendsRule{
-			Match: "m",
-			Base: []iptables.ExtendsElem{
-				{
+	mainChain := allNewIptables.GetChain("mangle", "MainEntry")
+	if mainChain == nil {
+		logger.Warning("main chain has no entry")
+		return
+	}
+	// check if global exist
+	index, exist := mainChain.GetCreateChildIndex("GlobalEntry")
+	if !exist {
+		// correct index if not exist
+		index = mainChain.GetRulesCount()
+	}
+	// command line
+	// iptables -t mangle -I All_Entry $1 -p tcp -m cgroup --path app.slice -j App_Proxy
+	cpl := &newIptables.CompleteRule{
+		// base rules slice         -p tcp
+		BaseSl: []newIptables.BaseRule{
+			{
+				Match: "p",
+				Param: "tcp",
+			},
+		},
+		// extends rules slice       -m cgroup --path app.slice -j App_Proxy
+		ExtendsSl: []newIptables.ExtendsRule{
+			{
+				Match: "m",
+				Elem: newIptables.ExtendsElem{
 					Match: "cgroup",
-					Base: []iptables.BaseRule{
-						{
-							Match: "path",
-							Param: mgr.cgroupMember.GetCGroupPath(),
-						},
+					Base: newIptables.BaseRule{
+						Match: "path",
+						Param: mgr.scope.String(),
 					},
 				},
 			},
 		},
 	}
-	err = allIptables.CreateChain("mangle", "OUTPUT", cgroup.AppProxyLevel-1, "App", nil, extends)
+	childChain, err := mainChain.CreateChild("App", index, cpl)
 	if err != nil {
-		logger.Warningf("[%s] create chain failed, err: %v", err)
-		return err
+		return
 	}
-	// -t mangle -I OUTPUT -p tcp -j MARK -j MARK --set-mark 8090
-	bs := []iptables.BaseRule{
-		{
-			Match: "-set-mark",
-			Param: strconv.Itoa(mgr.Proxies.TPort),
-		},
-		{
-			Match: "p",
-			Param: "tcp",
-		},
-	}
-	// add mark
-	err = allIptables.AddRule("mangle", "App", iptables.MARK, bs, nil)
-	if err != nil {
-		logger.Warningf("[%s] add OUTPUT rule failed, err: %v", mgr.scope, err)
-		return err
-	}
-	logger.Debugf("[%s] add mark success", mgr.scope)
-
-	// add redirect
-	extends = []iptables.ExtendsRule{
-		iptables.ExtendsRule{
-			Match: "m",
-			Base: []iptables.ExtendsElem{
-				{
-					Match: "mark",
-					Base: []iptables.BaseRule{
-						{
-							Match: "mark",
-							Param: strconv.Itoa(mgr.Proxies.TPort),
-						},
-					},
-				},
-			},
-		},
-	}
-
-	bs = []iptables.BaseRule{
-		{
-			Match: "p",
-			Param: "tcp",
-		},
-		{
-			Match: "-on-port",
-			Param: strconv.Itoa(mgr.Proxies.TPort),
-		},
-	}
-	// transparent mark
-	err = allIptables.AddRule("mangle", "PREROUTING", iptables.TPROXY, bs, extends)
-	if err != nil {
-		logger.Warningf("[%s] add transparent rule failed, err: %v", mgr.scope, err)
-	}
-	// add ip rule
-	args := []string{"ip rule", "add fwmark", strconv.Itoa(mgr.Proxies.TPort), "lookup", "table 100"}
-	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
-	logger.Debugf("[%s] start to add ip rule %s", cmd.String())
-	buf, err := cmd.CombinedOutput()
-	if err != nil {
-		logger.Warningf("[%s] add ip rule failed, out: %s, err :%v", mgr.scope, string(buf), err)
-		return err
-	}
-	logger.Debugf("[%s] add ip rule success", mgr.scope)
-	return nil
+	mgr.chains[1] = childChain
 }
 
 // add proxy app

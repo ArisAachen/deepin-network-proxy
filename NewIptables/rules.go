@@ -2,10 +2,6 @@ package NewIptables
 
 import "strings"
 
-
-
-
-
 // define operation
 type Operation int
 
@@ -53,13 +49,19 @@ const (
 
 // base rule
 type BaseRule struct {
+	Mark  bool   // !
 	Match string // -s
 	Param string // 1111.2222.3333.4444
 }
 
 // make string  -s 1111.2222.3333.4444
 func (bs *BaseRule) String() string {
-	sl := []string{"-" + bs.Match, bs.Param}
+	var sl []string
+	// if mark as false
+	if bs.Mark {
+		sl = append(sl, "!")
+	}
+	sl = append(sl, "-"+bs.Match, bs.Param)
 	return strings.Join(sl, " ")
 }
 

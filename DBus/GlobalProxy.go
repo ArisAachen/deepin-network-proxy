@@ -2,6 +2,7 @@ package DBus
 
 import (
 	"fmt"
+	newIptables "github.com/DeepinProxy/NewIptables"
 
 	cgroup "github.com/DeepinProxy/CGroups"
 	config "github.com/DeepinProxy/Config"
@@ -99,4 +100,45 @@ func (mgr *GlobalProxy) IgnoreProxyApps(apps []string) *dbus.Error {
 func (mgr *GlobalProxy) UnIgnoreProxyApps(apps []string) *dbus.Error {
 	mgr.proxyPrv.delCGroupExes(apps)
 	return nil
+}
+
+// init new iptables
+func (mgr *GlobalProxy) createTable() {
+	err := mgr.proxyPrv.initNewIptables()
+	if err != nil {
+		return
+	}
+	mainChain := allNewIptables.GetChain("mangle", "MainEntry")
+	if mainChain == nil {
+		logger.Warning("main chain has no entry")
+		return
+	}
+	// command line
+	// iptables -t mangle -I All_Entry $1 -p tcp -m cgroup --path app.slice -j App_Proxy
+	base := newIptables.BaseRule{
+		Match: "p",
+		Param: "tcp",
+	}
+	extends := newIptables.ExtendsRule{
+		Match: "m",
+		Elem: newIptables.ExtendsElem{
+			Match: "cgroup",
+			Base: newIptables.BaseRule{
+				Match: "path",
+				Param: mgr.scope.String(),
+			},
+		},
+	}
+	cpl := &newIptables.CompleteRule{
+		// base rules slice         -p tcp
+		BaseSl: []newIptables.BaseRule{base},
+		// extends rules slice       -m cgroup !--path global.slice -j Global
+		ExtendsSl: []newIptables.ExtendsRule{extends},
+	}
+	index := mainChain.GetRulesCount()
+	childChain, err := mainChain.CreateChild("Global", index, cpl)
+	if err != nil {
+		return
+	}
+	mgr.chains[1] = childChain
 }
