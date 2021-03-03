@@ -80,9 +80,10 @@ func (c *Chain) indexValid(index int) bool {
 func (c *Chain) CreateChild(name string, index int, cpl *CompleteRule) (*Chain, error) {
 	// create child
 	child := &Chain{
-		Name:   name,
-		table:  c.table, // the same table with parent
-		parent: c,       // set this as parent
+		Name:     name,
+		table:    c.table, // the same table with parent
+		parent:   c,       // set this as parent
+		children: make(map[string]*Chain),
 	}
 	// create chain
 	err := c.table.runCommand(New, child, 0, nil)
@@ -97,10 +98,10 @@ func (c *Chain) CreateChild(name string, index int, cpl *CompleteRule) (*Chain, 
 		logger.Warningf("[%s] chain %s attach child %s failed, err: %v", c.table.Name, c.Name, name, err)
 		return nil, err
 	}
-	// set parent
-	child.setParent(c)
 	// add to table
 	c.table.chains[name] = child
+	// add to child
+	c.children[name] = child
 	logger.Debugf("[%s] chain %s create child %s success", c.table.Name, c.Name, name)
 	// return handler
 	return child, nil
@@ -156,7 +157,7 @@ func (c *Chain) Clear() error {
 			logger.Warningf("[%s] chain %s remove child chain %s failed, err: %v", c.table.Name, c.Name, child.Name, err)
 			continue
 		}
-		logger.Debugf("[%s] chain %s remove child chain %s success", c.table.Name, c.Name, child.Name, err)
+		logger.Debugf("[%s] chain %s remove child chain %s success", c.table.Name, c.Name, child.Name)
 	}
 	// clear self chain
 	err := c.table.runCommand(Flush, c, 0, nil)
@@ -182,7 +183,7 @@ func (c *Chain) DelChild(child *Chain) error {
 	}
 	// check if child name is nil
 	if childName == "" {
-		logger.Warningf("[%s] chain %s has not child %s", c.Name, child.Name)
+		logger.Warningf("[%s] chain %s has not child %s", c.table.Name, c.Name, child.Name)
 		return nil
 	}
 	logger.Debugf("[%s] chain %s has child %s, begin to delete", c.table.Name, c.Name, child.Name)

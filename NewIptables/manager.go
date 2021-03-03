@@ -65,8 +65,10 @@ func (m *Manager) Init() {
 		for _, cName := range cNameSl {
 			// default chain dont need to create
 			chain := &Chain{
-				Name:  cName,
-				table: table,
+				Name:      cName,
+				table:     table,
+				children:  make(map[string]*Chain),
+				cplRuleSl: []*CompleteRule{},
 			}
 			// add chain to table
 			table.chains[cName] = chain

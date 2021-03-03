@@ -140,7 +140,7 @@ func (mgr *AppProxy) createTable() error {
 			},
 		},
 	}
-	childChain, err := mainChain.CreateChild("App", index, cpl)
+	childChain, err := mainChain.CreateChild("AppEntry", index, cpl)
 	if err != nil {
 		return err
 	}

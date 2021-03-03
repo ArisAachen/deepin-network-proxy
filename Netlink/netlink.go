@@ -241,7 +241,7 @@ func (p *ProcManager) listen() error {
 		switch header.What {
 		// proc exec
 		case C.PROC_EVENT_EXEC:
-			logger.Debug("recv message is proc exec")
+			logger.Debugf("recv message is proc exec, id: %v", C.PROC_EVENT_EXEC)
 			event := &ExecProcEvent{}
 			err = binary.Read(bytBuf, binary.LittleEndian, event)
 			if err != nil {
@@ -261,7 +261,7 @@ func (p *ProcManager) listen() error {
 			}
 		// proc exit
 		case C.PROC_EVENT_EXIT:
-			logger.Debug("recv message is proc exit")
+			logger.Debugf("recv message is proc exit,id :%v", C.PROC_EVENT_EXIT)
 			event := &ExitProcEvent{}
 			err = binary.Read(bytBuf, binary.LittleEndian, event)
 			if err != nil {
@@ -275,6 +275,17 @@ func (p *ProcManager) listen() error {
 				pid := strconv.Itoa(int(event.ProcessPid))
 				logger.Debugf("del proc exec, Pid [%s]", pid)
 				p.delProc(pid)
+			}
+		case C.PROC_EVENT_COMM:
+			logger.Debugf("recv message is proc comm,id :%v", C.PROC_EVENT_COMM)
+			event := &CommEvent{}
+			err = binary.Read(bytBuf, binary.LittleEndian, event)
+			if err != nil {
+				logger.Warningf("comm event err: %v", err)
+				continue
+			}
+			if event.ProcessPid == 17472 {
+				logger.Debugf("comm vent pid %v, message: %s", event.ProcessPid, string(buf))
 			}
 		default:
 			logger.Debugf("recv message is proc: %v", header.What)

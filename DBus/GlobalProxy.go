@@ -44,7 +44,7 @@ func NewGlobalProxy() *GlobalProxy {
 	global.loadConfig()
 	_ = global.initCGroup()
 
-	_ = global.createTable()
+	// _ = global.createTable()
 	return global
 }
 

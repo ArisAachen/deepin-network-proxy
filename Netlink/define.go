@@ -61,3 +61,10 @@ type ExitProcEvent struct {
 	ExitCode    uint32
 	ExitSignal  uint32
 }
+
+// comm event
+type CommEvent struct {
+	ProcessPid  uint32
+	ProcessTgid uint32
+	Buf         [16]byte
+}
