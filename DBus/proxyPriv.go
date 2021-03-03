@@ -9,7 +9,6 @@ import (
 	cgroup "github.com/DeepinProxy/CGroups"
 	com "github.com/DeepinProxy/Com"
 	config "github.com/DeepinProxy/Config"
-	iptables "github.com/DeepinProxy/Iptables"
 	newIptables "github.com/DeepinProxy/NewIptables"
 	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
@@ -26,10 +25,6 @@ var onceCfg sync.Once
 // use to int cgroup v2
 var allCGroups *cgroup.CGroupManager
 var onceCgp sync.Once
-
-// use to init iptables manager
-var allIptables *iptables.TablesManager
-var onceTb sync.Once
 
 // use to init iptables manager
 var allNewIptables *newIptables.Manager
@@ -62,8 +57,6 @@ type proxyPrv struct {
 
 	// iptables chain rule slice[2]
 	chains [2]*newIptables.Chain
-	// to store self added
-	cplSl  []*newIptables.CompleteRule
 
 	// handler manager
 	handlerMgr *tProxy.HandlerMgr

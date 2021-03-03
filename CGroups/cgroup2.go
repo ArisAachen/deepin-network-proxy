@@ -89,42 +89,6 @@ func (c *CGroupManager) CreateCGroup(level int, elemPath string) (*CGroupMember,
 	return member, nil
 }
 
-//// add proc path to cgroup elem
-//func (c *CGroupManager) AddCGroupProcs(elem string, procs []string) {
-//	// lock
-//	c.lock.Lock()
-//	defer c.lock.Unlock()
-//
-//	// add
-//	for _, cgroup := range c.CGroups {
-//		if cgroup.path == elem {
-//			logger.Debugf("cgroup [%s] found in manager, begin to add tgtExeSl [%s]", elem, procs)
-//			cgroup.AddTgtExes(procs)
-//			return
-//		}
-//	}
-//	// if not found, out put log
-//	logger.Warningf("cgroup [%s] not found in manager", elem)
-//}
-//
-//// add proc path to cgroup elem
-//func (c *CGroupManager) DelCGroupProcs(elem string, procs []string) {
-//	// lock
-//	c.lock.Lock()
-//	defer c.lock.Unlock()
-//
-//	// add
-//	for _, cgroup := range c.CGroups {
-//		if cgroup.path == elem {
-//			logger.Debugf("cgroup [%s] found in manager, begin to del proc [%s]", elem, procs)
-//			cgroup.delTgtExes(procs)
-//			return
-//		}
-//	}
-//	// if not found, out put log
-//	logger.Warningf("cgroup [%s] not found in manager", elem)
-//}
-
 func (c *CGroupManager) GetCGroupMember(exe string) *CGroupMember {
 	// lock
 	c.lock.Lock()

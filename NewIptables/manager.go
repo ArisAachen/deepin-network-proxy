@@ -48,17 +48,18 @@ func NewManager() *Manager {
 	manager := &Manager{
 		tables: make(map[string]*Table),
 	}
-	manager.Init()
 	return manager
 }
 
 // init table
 func (m *Manager) Init() {
+	logger.Debug("init manager")
 	// init default table and chain
 	for tName, cNameSl := range tableSl {
 		// create tables to manager
 		table := &Table{
-			Name: tName,
+			Name:   tName,
+			chains: make(map[string]*Chain),
 		}
 		// create chain to table
 		for _, cName := range cNameSl {

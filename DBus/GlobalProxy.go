@@ -43,6 +43,8 @@ func NewGlobalProxy() *GlobalProxy {
 	}
 	global.loadConfig()
 	_ = global.initCGroup()
+
+	_ = global.createTable()
 	return global
 }
 
@@ -103,15 +105,15 @@ func (mgr *GlobalProxy) UnIgnoreProxyApps(apps []string) *dbus.Error {
 }
 
 // init new iptables
-func (mgr *GlobalProxy) createTable() {
+func (mgr *GlobalProxy) createTable() error {
 	err := mgr.proxyPrv.initNewIptables()
 	if err != nil {
-		return
+		return err
 	}
 	mainChain := allNewIptables.GetChain("mangle", "MainEntry")
 	if mainChain == nil {
 		logger.Warning("main chain has no entry")
-		return
+		return err
 	}
 	// command line
 	// iptables -t mangle -I All_Entry $1 -p tcp -m cgroup --path app.slice -j App_Proxy
@@ -125,11 +127,13 @@ func (mgr *GlobalProxy) createTable() {
 			Match: "cgroup",
 			Base: newIptables.BaseRule{
 				Match: "path",
-				Param: mgr.scope.String(),
+				Param: "global.slice",
 			},
 		},
 	}
 	cpl := &newIptables.CompleteRule{
+		// -j Global
+		Action: "Global",
 		// base rules slice         -p tcp
 		BaseSl: []newIptables.BaseRule{base},
 		// extends rules slice       -m cgroup !--path global.slice -j Global
@@ -138,7 +142,8 @@ func (mgr *GlobalProxy) createTable() {
 	index := mainChain.GetRulesCount()
 	childChain, err := mainChain.CreateChild("Global", index, cpl)
 	if err != nil {
-		return
+		return err
 	}
 	mgr.chains[1] = childChain
+	return nil
 }

@@ -98,15 +98,15 @@ func (mgr *AppProxy) initCGroup() error {
 }
 
 // init new iptables
-func (mgr *AppProxy) createTable() {
+func (mgr *AppProxy) createTable() error {
 	err := mgr.proxyPrv.initNewIptables()
 	if err != nil {
-		return
+		return err
 	}
 	mainChain := allNewIptables.GetChain("mangle", "MainEntry")
 	if mainChain == nil {
 		logger.Warning("main chain has no entry")
-		return
+		return err
 	}
 	// check if global exist
 	index, exist := mainChain.GetCreateChildIndex("GlobalEntry")
@@ -117,6 +117,8 @@ func (mgr *AppProxy) createTable() {
 	// command line
 	// iptables -t mangle -I All_Entry $1 -p tcp -m cgroup --path app.slice -j App_Proxy
 	cpl := &newIptables.CompleteRule{
+		// -j App
+		Action: "App",
 		// base rules slice         -p tcp
 		BaseSl: []newIptables.BaseRule{
 			{
@@ -132,7 +134,7 @@ func (mgr *AppProxy) createTable() {
 					Match: "cgroup",
 					Base: newIptables.BaseRule{
 						Match: "path",
-						Param: mgr.scope.String(),
+						Param: "app.slice",
 					},
 				},
 			},
@@ -140,9 +142,10 @@ func (mgr *AppProxy) createTable() {
 	}
 	childChain, err := mainChain.CreateChild("App", index, cpl)
 	if err != nil {
-		return
+		return err
 	}
 	mgr.chains[1] = childChain
+	return nil
 }
 
 // add proxy app

@@ -19,6 +19,7 @@ func (mgr *proxyPrv) initNewIptables() error {
 	}
 
 	onceNewTb.Do(func() {
+		logger.Debug("once new iptables")
 		// init  iptables manager once
 		allNewIptables = newIptables.NewManager()
 		// init once
@@ -26,7 +27,7 @@ func (mgr *proxyPrv) initNewIptables() error {
 		// create mangle output
 		outputChain := allNewIptables.GetChain("mangle", "OUTPUT")
 		// create child chain under output chain
-		mainChain, err := outputChain.CreateChild("MainEntry", 0, nil)
+		mainChain, err := outputChain.CreateChild("MainEntry", 0, &newIptables.CompleteRule{Action: "MainEntry"})
 		if err != nil {
 			logger.Warningf("[%s] create main chain failed, err: %v", mgr.scope, err)
 			return

@@ -19,7 +19,7 @@ type Table struct {
 // run iptables command
 func (t *Table) runCommand(operation Operation, chain *Chain, index int, cpl *CompleteRule) error {
 	// run command
-	args := []string{"iptables", "-t", t.Name, operation.ToString(), chain.Name}
+	args := []string{"iptables", "-t", t.Name, "-" + operation.ToString(), chain.Name}
 	// add index
 	if index != 0 && operation == Insert {
 		args = append(args, strconv.Itoa(index))
@@ -215,7 +215,7 @@ func (c *Chain) AppendRule(cpl *CompleteRule) error {
 
 // insert rule
 func (c *Chain) InsertRule(operation Operation, index int, cpl *CompleteRule) error {
-	if c.indexValid(index) {
+	if !c.indexValid(index) {
 		logger.Warningf("[%s] chain %s add rule failed, index invalid", c.table.Name, c.Name)
 		return errors.New("index invalid")
 	}
@@ -229,7 +229,7 @@ func (c *Chain) InsertRule(operation Operation, index int, cpl *CompleteRule) er
 		logger.Warningf("[%s] chain %s flush failed", c.table.Name, c.Name, err)
 		return err
 	}
-	logger.Debugf("[%s] chain %s flush success", c.table.Name, c.Name)
+	logger.Debugf("[%s] chain %s insert success", c.table.Name, c.Name)
 	ifc, update, err := com.MegaInsert(c.cplRuleSl, cpl, index)
 	if err != nil {
 		logger.Warningf("[%s] inset failed, err: %v", c.table.Name, err)
@@ -267,13 +267,13 @@ func (c *Chain) DelRule(cpl *CompleteRule) error {
 	// clear self chain
 	err := c.table.runCommand(Delete, c, 0, cpl)
 	if err != nil {
-		logger.Warningf("[%s] chain %s flush failed", c.table.Name, c.Name, err)
+		logger.Warningf("[%s] chain %s del failed", c.table.Name, c.Name, err)
 		return err
 	}
 	// delete slice
 	ifc, update, err := com.MegaDel(c.cplRuleSl, cpl)
 	if err != nil {
-		logger.Warningf("[%s] inset failed, err: %v", c.table.Name, err)
+		logger.Warningf("[%s] del failed, err: %v", c.table.Name, err)
 		return err
 	}
 	if !update {
