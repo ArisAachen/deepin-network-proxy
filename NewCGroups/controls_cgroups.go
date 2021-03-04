@@ -334,19 +334,19 @@ func (c *Controller) MoveOut(path string) ControlProcSl {
 }
 
 // delete current control proc
-func (c *Controller) DelCtlProc(proc *netlink.ProcMessage, move bool) error {
+func (c *Controller) DelCtlProc(proc *netlink.ProcMessage) error {
 	// check if exist
 	if !c.CheckCtlProcExist(proc) {
 		return nil
 	}
 	// not move to other cgroup, should attach to origin cgroup
-	if !move {
-		// attach pid to origin cgroup
-		err := attach(proc.Pid, proc.CGroupPath)
-		if err != nil {
-			return err
-		}
-	}
+	//if !move {
+	//	// attach pid to origin cgroup
+	//	err := attach(proc.Pid, proc.CGroupPath)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 	procSl := c.CtlProcMap[proc.ExecPath]
 	// delete proc from self
 	ifc, update, err := com.MegaDel(procSl, proc)
