@@ -2,9 +2,9 @@ package NewCGroups
 
 import (
 	"errors"
+	"sort"
 
 	com "github.com/DeepinProxy/Com"
-	netlink "github.com/linuxdeepin/go-dbus-factory/com.deepin.system.procs"
 	"pkg.deepin.io/lib/log"
 )
 
@@ -14,67 +14,71 @@ type Manager struct {
 	controllers []*Controller
 }
 
-// get controller index according to name
-func (m *Manager) GetCreateControllerIndex(name string) (int, bool) {
-	for index, controller := range m.controllers {
-		if controller.Name == name {
-			return index, true
-		}
+// create manager
+func NewManager() *Manager {
+	manager := &Manager{
+		controllers: []*Controller{},
 	}
-	return 0, false
+	return manager
 }
 
-// check if index is valid
-func (m *Manager) validIndex(index int) bool {
-	return len(m.controllers) >= index
-}
-
-// create controller under cgroup/unified/
-func (m *Manager) CreateAppendController(name string) (*Controller, error) {
-	// check if controller exist
-	if _, exist := m.GetCreateControllerIndex(name); exist {
-		return nil, errors.New("controller already exist")
+// create controller handler
+func (m *Manager) CreatePriorityController(name string, priority int) (*Controller, error) {
+	if m.CheckControllerExist(name, priority) {
+		return nil, errors.New("controller name or priority already exist")
 	}
 	// create controller
 	controller := &Controller{
 		Name:       name,
+		Priority:   priority,
 		manager:    m,
 		CtlPathSl:  []string{},
-		CtlProcMap: make(map[string][]*netlink.ProcMessage),
+		CtlProcMap: make(map[string]ControlProcSl),
+	}
+	// make dir
+	err := com.GuaranteeDir(controller.GetControlPath())
+	if err != nil {
+		return nil, err
 	}
 	// append controller
 	m.controllers = append(m.controllers, controller)
-	return controller, nil
+	sort.SliceStable(m.controllers, func(i, j int) bool {
+		// sort by priority
+		if m.controllers[i].Priority > m.controllers[j].Priority {
+			return false
+		}
+		return true
+	})
+	return nil, nil
 }
 
-// create controller under cgroup/unified/
-func (m *Manager) CreateAfterController(name string, index int) (*Controller, error) {
-	// check index
-	if m.validIndex(index) {
-		return nil, errors.New("index is invalid")
+// get controller by control app path
+func (m *Manager) GetControllerByCtlPath(path string) *Controller {
+	// search app name
+	for _, controller := range m.controllers {
+		if controller.CheckCtlPathSl(path) {
+			logger.Debugf("[%s] controller find app path %s", controller.Name, path)
+			return controller
+		}
 	}
-	// check if already exist
-	if _, exist := m.GetCreateControllerIndex(name); exist {
-		return nil, errors.New("controller already exist")
+	logger.Debugf("app path %s cant found in any controller", path)
+	return nil
+}
+
+// check if name controller already exist
+func (m *Manager) CheckControllerExist(name string, priority int) bool {
+	// search name
+	for _, controller := range m.controllers {
+		if controller.Name == name || controller.Priority == priority {
+			return true
+		}
 	}
-	controller := &Controller{
-		Name:       name,
-		manager:    m,
-		CtlPathSl:  []string{},
-		CtlProcMap: make(map[string][]*netlink.ProcMessage),
-	}
-	// insert index
-	ifc, update, err := com.MegaInsert(m.controllers, controller, index)
-	if err != nil || update {
-		return nil, err
-	}
-	// convert
-	temp, ok := ifc.([]*Controller)
-	if !ok {
-		return nil, errors.New("convert failed")
-	}
-	m.controllers = temp
-	return controller, nil
+	return false
+}
+
+// get controller count
+func (m *Manager) GetControllerCount() int {
+	return len(m.controllers)
 }
 
 // init

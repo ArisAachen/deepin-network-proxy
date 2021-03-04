@@ -531,6 +531,7 @@ func MegaExist(src interface{}, tgt interface{}) bool {
 				return true
 			}
 		}
+		return false
 	}
 	return false
 }

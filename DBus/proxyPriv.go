@@ -9,6 +9,7 @@ import (
 	cgroup "github.com/DeepinProxy/CGroups"
 	com "github.com/DeepinProxy/Com"
 	config "github.com/DeepinProxy/Config"
+	newCGroups "github.com/DeepinProxy/NewCGroups"
 	newIptables "github.com/DeepinProxy/NewIptables"
 	tProxy "github.com/DeepinProxy/TProxy"
 	"github.com/godbus/dbus"
@@ -52,8 +53,14 @@ type proxyPrv struct {
 	// if proxy opened
 	Enabled bool
 
+	//// handler manager
+	//manager *Manager
+
 	// proxyMember to organize cgroup v2
 	cgroupMember *cgroup.CGroupMember
+
+	// cgroup controller
+	controller *newCGroups.Controller
 
 	// iptables chain rule slice[2]
 	chains [2]*newIptables.Chain
@@ -447,3 +454,4 @@ func (mgr *proxyPrv) proxyUdp(proxy config.Proxy, lAddr net.Addr, rAddr net.Addr
 		return
 	}
 }
+
