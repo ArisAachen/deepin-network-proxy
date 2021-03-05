@@ -31,40 +31,40 @@ type BaseHandler interface {
 	Communicate()
 }
 
-type ProxyScope string
-
-const (
-	NoneProxy   ProxyScope = "no-proxy"
-	GlobalProxy ProxyScope = "global"
-	AppProxy    ProxyScope = "app"
-)
-
-func BuildScope(scope string) (ProxyScope, error) {
-	switch scope {
-	case "no-proxy":
-		return NoneProxy, nil
-	case "global":
-		return GlobalProxy, nil
-	case "app":
-		return AppProxy, nil
-	default:
-		return NoneProxy, fmt.Errorf("scope is invalid, scope: %v", scope)
-	}
-}
-
-// scope
-func (Scope ProxyScope) String() string {
-	switch Scope {
-	case NoneProxy:
-		return "no-proxy"
-	case GlobalProxy:
-		return "global"
-	case AppProxy:
-		return "app"
-	default:
-		return "unknown-proxy"
-	}
-}
+//type ProxyScope string
+//
+//const (
+//	NoneProxy   ProxyScope = "no-proxy"
+//	GlobalProxy ProxyScope = "global"
+//	AppProxy    ProxyScope = "app"
+//)
+//
+//func BuildScope(scope string) (ProxyScope, error) {
+//	switch scope {
+//	case "no-proxy":
+//		return NoneProxy, nil
+//	case "global":
+//		return GlobalProxy, nil
+//	case "app":
+//		return AppProxy, nil
+//	default:
+//		return NoneProxy, fmt.Errorf("scope is invalid, scope: %v", scope)
+//	}
+//}
+//
+//// scope
+//func (Scope ProxyScope) String() string {
+//	switch Scope {
+//	case NoneProxy:
+//		return "no-proxy"
+//	case GlobalProxy:
+//		return "global"
+//	case AppProxy:
+//		return "app"
+//	default:
+//		return "unknown-proxy"
+//	}
+//}
 
 // proto
 type ProtoTyp string

@@ -2,6 +2,7 @@ package DBus
 
 import (
 	"fmt"
+	com "github.com/DeepinProxy/Com"
 
 	config "github.com/DeepinProxy/Config"
 	define "github.com/DeepinProxy/Define"
@@ -37,12 +38,8 @@ type GlobalProxy struct {
 
 func NewGlobalProxy() *GlobalProxy {
 	global := &GlobalProxy{
-		proxyPrv: initProxyPrv(define.Global),
+		proxyPrv: initProxyPrv(define.Global, define.GlobalPriority),
 	}
-	global.loadConfig()
-	// _ = global.initCGroup()
-
-	// _ = global.createTable()
 	return global
 }
 
@@ -61,13 +58,65 @@ func (mgr *GlobalProxy) export(service *dbusutil.Service) error {
 
 // add proxy app
 func (mgr *GlobalProxy) IgnoreProxyApps(apps []string) *dbus.Error {
-	mgr.proxyPrv.addCGroupExes(apps)
+	go func() {
+		_ = mgr.ignoreProxyApps(apps)
+	}()
+	return nil
+}
+
+func (mgr *GlobalProxy) ignoreProxyApps(apps []string) error {
+	// add app
+	for _, app := range apps {
+		// check if already exist
+		if com.MegaExist(mgr.Proxies.NoProxyProgram, app) {
+			return nil
+		}
+		// controller
+		err := mgr.controller.UpdateFromManager(app)
+		if err != nil {
+			return dbusutil.ToError(err)
+		}
+		mgr.Proxies.NoProxyProgram = append(mgr.Proxies.NoProxyProgram, app)
+		// check if is in proxying
+		if !mgr.Enabled {
+			return nil
+		}
+		return nil
+	}
 	return nil
 }
 
 // delete proxy app
 func (mgr *GlobalProxy) UnIgnoreProxyApps(apps []string) *dbus.Error {
-	mgr.proxyPrv.delCGroupExes(apps)
+	go func() {
+		_ = mgr.unIgnoreProxyApps(apps)
+	}()
 	return nil
 }
 
+func (mgr *GlobalProxy) unIgnoreProxyApps(apps []string) error {
+	// add app
+	for _, app := range apps {
+		// check if already exist
+		if !com.MegaExist(mgr.Proxies.NoProxyProgram, app) {
+			return nil
+		}
+		// controller
+		err := mgr.controller.ReleaseToManager(app)
+		if err != nil {
+			return dbusutil.ToError(err)
+		}
+		ifc, _, err := com.MegaDel(mgr.Proxies.NoProxyProgram, app)
+		if err != nil {
+			logger.Warningf("[%s] del proxy app %s failed, err: %v", mgr.scope, app, err)
+			return err
+		}
+		temp, ok := ifc.([]string)
+		if !ok {
+			return nil
+		}
+		mgr.Proxies.NoProxyProgram = temp
+		return nil
+	}
+	return nil
+}

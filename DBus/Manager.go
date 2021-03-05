@@ -111,6 +111,10 @@ func (m *Manager) WriteConfig() error {
 func (m *Manager) Export() error {
 	// app
 	appProxy := newProxy(define.App)
+	// save manager
+	appProxy.saveManager(m)
+	// load config
+	appProxy.loadConfig()
 	// create cgroups controller
 	err := appProxy.export(m.sesService)
 	if err != nil {
@@ -121,6 +125,10 @@ func (m *Manager) Export() error {
 
 	// global
 	globalProxy := newProxy(define.Global)
+	// save manager
+	globalProxy.saveManager(m)
+	// load config
+	globalProxy.loadConfig()
 	// create cgroups controller
 	err = globalProxy.export(m.sesService)
 	if err != nil {

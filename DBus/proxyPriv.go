@@ -1,11 +1,9 @@
 package DBus
 
 import (
-	"os"
 	"sync"
 
 	cgroup "github.com/DeepinProxy/CGroups"
-	com "github.com/DeepinProxy/Com"
 	config "github.com/DeepinProxy/Config"
 	define "github.com/DeepinProxy/Define"
 	newCGroups "github.com/DeepinProxy/NewCGroups"
@@ -63,9 +61,10 @@ type proxyPrv struct {
 }
 
 // init proxy private
-func initProxyPrv(scope define.Scope) proxyPrv {
+func initProxyPrv(scope define.Scope, priority define.Priority) proxyPrv {
 	return proxyPrv{
 		scope:      scope,
+		priority:   priority,
 		handlerMgr: tProxy.NewHandlerMsg(scope),
 		Proxies: config.ScopeProxies{
 			Proxies:      make(map[string][]config.Proxy),
@@ -82,36 +81,18 @@ func (mgr *proxyPrv) loadConfig() {
 	logger.Debugf("[%s] load config success, config: %v", mgr.scope, mgr.Proxies)
 }
 
+func (mgr *proxyPrv) saveManager(manager *Manager) {
+	mgr.manager = manager
+}
+
 // write config
 func (mgr *proxyPrv) writeConfig() error {
-	// get config path
-	path, err := com.GetUserConfigDir()
-	if err != nil {
-		logger.Warningf("[%s] get user home dir failed, user:%v, err: %v", mgr.scope, os.Geteuid(), err)
-		return err
-	}
-	// check if all proxy is legal
-	if allProxyCfg == nil {
-		return err
-	}
 	// set and write config
-	allProxyCfg.SetScopeProxies(mgr.scope, mgr.Proxies)
-	err = allProxyCfg.WritePxyCfg(path)
+	mgr.manager.config.SetScopeProxies(mgr.scope, mgr.Proxies)
+	err := mgr.manager.WriteConfig()
 	if err != nil {
-		logger.Warningf("[%s] write config file failed, err: %v", mgr.scope, err)
+		logger.Warning("[%s] write config failed, err:%v", mgr.scope, err)
 		return err
 	}
 	return nil
-}
-
-// add cgroup proc
-func (mgr *proxyPrv) addCGroupExes(exes []string) {
-	mgr.cgroupMember.AddTgtExes(exes)
-	//allCGroups.AddCGroupProcs(elem, procs)
-}
-
-// add cgroup proc
-func (mgr *proxyPrv) delCGroupExes(exes []string) {
-	mgr.cgroupMember.DelTgtExes(exes, true)
-	//allCGroups.DelCGroupProcs(elem, procs)
 }

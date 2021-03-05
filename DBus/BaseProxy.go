@@ -17,6 +17,10 @@ type BaseProxy interface {
 	SetProxies(proxies config.ScopeProxies) *dbus.Error
 	ClearProxies() *dbus.Error
 
+	// manager
+	loadConfig()
+	saveManager(manager *Manager)
+
 	// getScope() tProxy.ProxyScope
 	getDBusPath() dbus.ObjectPath
 	getScope() define.Scope
@@ -24,9 +28,9 @@ type BaseProxy interface {
 	// get cgroup v2 level
 	getCGroupPriority() define.Priority
 
-	// cgroup v2
-	addCGroupExes(procs []string)
-	delCGroupExes(procs []string)
+	//// cgroup v2
+	//addCGroupExes(procs []string)
+	//delCGroupExes(procs []string)
 
 	// iptables
 	appendRule() error

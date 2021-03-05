@@ -16,6 +16,3 @@ func (mgr *proxyPrv) createCGroupController() error {
 	return nil
 }
 
-func (mgr *proxyPrv) setManager(manager *Manager) {
-	mgr.manager = manager
-}

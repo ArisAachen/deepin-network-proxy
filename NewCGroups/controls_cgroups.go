@@ -1,6 +1,7 @@
 package NewCGroups
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 
@@ -168,7 +169,7 @@ func (c *Controller) CheckCtlProcExist(proc *netlink.ProcMessage) bool {
 	}
 	// check exist
 	for _, elem := range procSl {
-		if reflect.DeepEqual(elem, proc) {
+		if reflect.DeepEqual(*elem, *proc) {
 			return true
 		}
 	}
@@ -196,7 +197,7 @@ func (c *Controller) AddCtrlProc(proc *netlink.ProcMessage) error {
 }
 
 // move lower priority proc in
-func (c *Controller) UpdateFromManager() error {
+func (c *Controller) UpdateFromManagerAll() error {
 	var lower bool
 	for index := 0; index < c.manager.GetControllerCount(); index++ {
 		// check if	is the same
@@ -217,6 +218,31 @@ func (c *Controller) UpdateFromManager() error {
 	return nil
 }
 
+// move lower priority proc in
+func (c *Controller) UpdateFromManager(path string) error {
+	controller := c.manager.GetControllerByCtlPath(path)
+	// check if controller exist
+	if controller != nil {
+		// dont remove, because current priority is higher
+		if controller.Priority >= c.Priority {
+			logger.Debug("[%s] dont need update procs %s, %s has higher priority", c.Name, path, controller.Priority)
+			return nil
+		}
+		procSl := controller.MoveOut(path)
+		// check length
+		if len(procSl) == 0 {
+			return nil
+		}
+		err := c.MoveIn(path, procSl)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	logger.Debug("[%s] dont need update procs %s, cant find any controller", c.Name, path)
+	return nil
+}
+
 // release all proc from controller, that may happen when stop controller
 func (c *Controller) ReleaseAll() error {
 	logger.Debugf("[%s] start release all procs", c.Name)
@@ -227,6 +253,13 @@ func (c *Controller) ReleaseAll() error {
 			return err
 		}
 	}
+	// remove dir
+	err := os.RemoveAll(c.GetCGroupPath())
+	if err != nil {
+		logger.Warning("[%s] remove cgroups path %s failed, err: %v", c.Name, c.GetCGroupPath(), err)
+		return err
+	}
+
 	logger.Debugf("[%s] release all procs success", c.Name)
 	return nil
 }
