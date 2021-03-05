@@ -373,14 +373,6 @@ func (c *Controller) DelCtlProc(proc *netlink.ProcMessage) error {
 	if !c.CheckCtlProcExist(proc) {
 		return nil
 	}
-	// not move to other cgroup, should attach to origin cgroup
-	//if !move {
-	//	// attach pid to origin cgroup
-	//	err := attach(proc.Pid, proc.CGroupPath)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
 	procSl := c.CtlProcMap[proc.ExecPath]
 	// delete proc from self
 	ifc, update, err := com.MegaDel(procSl, proc)
@@ -394,27 +386,6 @@ func (c *Controller) DelCtlProc(proc *netlink.ProcMessage) error {
 	c.CtlProcMap[proc.ExecPath] = temp
 	return nil
 }
-
-//// release all proc
-//func (c *Controller) ReleaseAll() error {
-//
-//	return nil
-//}
-//
-//// release control path proc
-//func (c *Controller) Release(path string) error {
-//	// get all proc message
-//	procSl, ok := c.CtlProcMap[path]
-//	if !ok {
-//		return nil
-//	}
-//	// attach pid to origin place
-//	for _, proc := range procSl {
-//		_ = attach(proc.Pid, proc.CGroupPath)
-//	}
-//
-//	return nil
-//}
 
 // /sys/fs/cgroup/unified/App.slice/cgroup.procs
 func (c *Controller) GetControlPath() string {

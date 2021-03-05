@@ -1,6 +1,7 @@
 package DBus
 
 import (
+	"errors"
 	com "github.com/DeepinProxy/Com"
 	"os"
 	"sync"
@@ -221,6 +222,36 @@ func (m *Manager) initCGroups() error {
 		return err
 	}
 	return nil
+}
+
+// format current procs
+func (m *Manager) GetAllProcs() (map[string]newCGroups.ControlProcSl, error) {
+	// check service
+	if m.procsService == nil {
+		logger.Warning("[manager] get procs failed, service not init")
+		return nil, errors.New("service not init")
+	}
+	// get procs message
+	// map[pid]{pid exec cgroups}
+	procs, err := m.procsService.Procs().Get(0)
+	if err != nil {
+		logger.Warningf("[%s] get procs failed, err: %v", err)
+		return nil, err
+	}
+	// map[exec][pid exec cgroups]
+	ctrlProcMap := make(map[string]newCGroups.ControlProcSl)
+	for _, proc := range procs {
+		execPath := proc.ExecPath
+		ctrlProcSl, ok := ctrlProcMap[execPath]
+		// if not exist, add one
+		if !ok {
+			ctrlProcSl = newCGroups.ControlProcSl{}
+			ctrlProcMap[execPath] = ctrlProcSl
+		}
+		// append
+		ctrlProcSl = append(ctrlProcSl, &proc)
+	}
+	return ctrlProcMap, nil
 }
 
 // start listen
