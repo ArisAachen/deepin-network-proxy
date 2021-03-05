@@ -1,8 +1,11 @@
 package DBus
 
 import (
+	com "github.com/DeepinProxy/Com"
+	"os"
 	"sync"
 
+	config "github.com/DeepinProxy/Config"
 	define "github.com/DeepinProxy/Define"
 	newCGroups "github.com/DeepinProxy/NewCGroups"
 	newIptables "github.com/DeepinProxy/NewIptables"
@@ -20,11 +23,14 @@ type Manager struct {
 	sigLoop      *dbusutil.SignalLoop
 
 	// proxy handler
-	handler []*BaseProxy
+	handler []BaseProxy
 
 	// cgroup manager
 	mainController *newCGroups.Controller
 	controllerMgr  *newCGroups.Manager
+
+	// config
+	config *config.ProxyConfig
 
 	// iptables manager
 	mainChain   *newIptables.Chain // main attach chain
@@ -32,6 +38,14 @@ type Manager struct {
 
 	// if current listening
 	runOnce *sync.Once
+}
+
+// make manager
+func NewManager() *Manager {
+	manager := &Manager{
+
+	}
+	return manager
 }
 
 // inti manager
@@ -59,40 +73,61 @@ func (m *Manager) Init() error {
 	return nil
 }
 
+// load config
+func (m *Manager) LoadConfig() error {
+	// get effective user config dir
+	path, err := com.GetUserConfigDir()
+	if err != nil {
+		logger.Warningf("failed to get user home dir, user:%v, err: %v", os.Geteuid(), err)
+		return err
+	}
+	// config
+	m.config = config.NewProxyCfg()
+	err = m.config.LoadPxyCfg(path)
+	if err != nil {
+		logger.Warningf("load config failed, path: %s, err: %v", path, err)
+		return err
+	}
+	return nil
+}
+
+// write config
+func (m *Manager) WriteConfig() error {
+	// get config path
+	path, err := com.GetUserConfigDir()
+	if err != nil {
+		logger.Warningf("[manager] get user home dir failed, user:%v, err: %v", os.Geteuid(), err)
+		return err
+	}
+	err = m.config.WritePxyCfg(path)
+	if err != nil {
+		logger.Warningf("[manager] write config file failed, err: %v", err)
+		return err
+	}
+	return nil
+}
+
 // create handler and export service
 func (m *Manager) Export() error {
 	// app
-	appProxy := NewAppProxy()
+	appProxy := newProxy(define.App)
 	// create cgroups controller
-	appController, err := m.controllerMgr.CreatePriorityController(define.App, define.AppPriority)
+	err := appProxy.export(m.sesService)
 	if err != nil {
 		logger.Warningf("create app proxy controller failed, err: %v", err)
 		return err
 	}
-	// set controller
-	appProxy.setController(appController)
-	// export app dbus path
-	err = m.sesService.Export(appProxy.getDBusPath(), appProxy)
-	if err != nil {
-		logger.Warningf("export app proxy failed, err: %v", err)
-		return err
-	}
-	// m.handler = append(m.handler,appProxy)
+	m.handler = append(m.handler, appProxy)
 
 	// global
-	globalProxy := NewGlobalProxy()
-	globalController, err := m.controllerMgr.CreatePriorityController(define.Global, define.GlobalPriority)
-	if err != nil {
-		logger.Warningf("create global proxy controller failed, err: %v", err)
-		return err
-	}
-	// set controller
-	globalProxy.setController(globalController)
-	err = m.sesService.Export(globalProxy.getDBusPath(), globalProxy)
+	globalProxy := newProxy(define.Global)
+	// create cgroups controller
+	err = globalProxy.export(m.sesService)
 	if err != nil {
 		logger.Warningf("export app proxy failed, err: %v", err)
 		return err
 	}
+	m.handler = append(m.handler, globalProxy)
 
 	// request dbus service
 	err = m.sesService.RequestName(BusServiceName)
@@ -103,6 +138,10 @@ func (m *Manager) Export() error {
 	return nil
 }
 
+func (m *Manager) Wait() {
+	m.sesService.Wait()
+}
+
 // only run once method
 func (m *Manager) Start() {
 	// if need reset once
@@ -111,9 +150,19 @@ func (m *Manager) Start() {
 	}
 	m.runOnce.Do(func() {
 		// init cgroups
-		_ = m.initCGroups()
+		err := m.initCGroups()
+		if err != nil {
+			logger.Warning("init cgroup failed, err: %v", err)
+		}
 		// iptables init
-		_ = m.initIptables()
+		err = m.initIptables()
+		if err != nil {
+			logger.Warning("init iptables failed, err: %v", err)
+		}
+		err = m.Listen()
+		if err != nil {
+			logger.Warning("init iptables failed, err: %v", err)
+		}
 	})
 }
 
@@ -163,7 +212,6 @@ func (m *Manager) initCGroups() error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -208,15 +256,6 @@ func (m *Manager) Listen() error {
 	return nil
 }
 
-//// release iptables rule
-//func (m *Manager) releaseRules() error {
-//
-//	if m.mainChain.GetChildrenCount() == 0 {
-//
-//	}
-//	return nil
-//}
-
 // release all source
 func (m *Manager) release() error {
 	// check if all app and global proxy has stopped
@@ -231,7 +270,14 @@ func (m *Manager) release() error {
 	// remove chain
 	err := m.mainChain.Remove()
 	if err != nil {
-		logger.Warningf("remove main chain failed, err: %v", err)
+		logger.Warningf("[manager] remove main chain failed, err: %v", err)
+		return err
+	}
+
+	// release all control procs
+	err = m.mainController.ReleaseAll()
+	if err != nil {
+		logger.Warning("[manager] release all control procs failed, err:", err)
 		return err
 	}
 

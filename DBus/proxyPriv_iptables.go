@@ -8,63 +8,6 @@ import (
 	"strconv"
 )
 
-// init iptables, may include read origin iptables later
-func (mgr *proxyPrv) initNewIptables() error {
-	//// init once
-	//if onceNewTb == nil {
-	//	// reset once to init func once
-	//	onceNewTb = new(sync.Once)
-	//}
-	//
-	//onceNewTb.Do(func() {
-	//	logger.Debug("once new iptables")
-	//	// init  iptables manager once
-	//	allNewIptables = newIptables.NewManager()
-	//	// init once
-	//	allNewIptables.Init()
-	//	// create mangle output
-	//	outputChain := allNewIptables.GetChain("mangle", "OUTPUT")
-	//	// create child chain under output chain
-	//	mainChain, err := outputChain.CreateChild("MainEntry", 0, &newIptables.CompleteRule{Action: "MainEntry"})
-	//	if err != nil {
-	//		logger.Warningf("[%s] create main chain failed, err: %v", mgr.scope, err)
-	//		return
-	//	}
-	//	// mainChain add default rule
-	//	// iptables -t mangle -A All_Entry -m cgroup --path main.slice -j RETURN
-	//	extends := newIptables.ExtendsRule{
-	//		// -m
-	//		Match: "m",
-	//		// cgroup --path main.slice
-	//		Elem: newIptables.ExtendsElem{
-	//			// cgroup
-	//			Match: "cgroup",
-	//			// --path main.slice
-	//			Base: newIptables.BaseRule{Match: "path", Param: cgroup.MainGRP + ".slice"},
-	//		},
-	//	}
-	//	// one complete rule
-	//	cpl := &newIptables.CompleteRule{
-	//		// -j RETURN
-	//		Action: newIptables.RETURN,
-	//		BaseSl: nil,
-	//		// -m cgroup --path main.slice -j RETURN
-	//		ExtendsSl: []newIptables.ExtendsRule{extends},
-	//	}
-	//	// append rule
-	//	err = mainChain.AppendRule(cpl)
-	//	return
-	//})
-	//// all app or global proxy has the mangle PREROUTING chain
-	//chain := allNewIptables.GetChain("mangle", "PREROUTING")
-	//if chain == nil {
-	//	logger.Warningf("[%s] has no mangle PREROUTING chain", mgr.scope)
-	//	return errors.New("has no mangle PREROUTING chain")
-	//}
-	//mgr.chains[0] = chain
-	return nil
-}
-
 // create tables
 func (mgr *proxyPrv) createTable() error {
 	// start manager to init iptables and cgroups once
@@ -228,26 +171,5 @@ func (mgr *proxyPrv) releaseRule() error {
 		logger.Warningf("[%s] delete rule failed, err: %v", mgr.scope, err)
 		return err
 	}
-
-	// try to release all source
-	err = mgr.manager.release()
-
-	//// get main chain
-	//mainChain := allNewIptables.GetChain("mangle", "MainEntry")
-	//if mainChain == nil {
-	//	return nil
-	//}
-	//// check if has children, if not delete self
-	//if mainChain.GetChildrenCount() == 0 {
-	//	// remove self
-	//	err = mainChain.Remove()
-	//	if err != nil {
-	//		logger.Warningf("[%s] remove main chain failed, err: %v", mgr.scope, err)
-	//		return err
-	//	}
-	//	// reset
-	//	onceNewTb = nil
-	//	allNewIptables = nil
-	//}
 	return nil
 }

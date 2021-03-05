@@ -3,7 +3,6 @@ package DBus
 import (
 	"fmt"
 
-	cgroup "github.com/DeepinProxy/CGroups"
 	config "github.com/DeepinProxy/Config"
 	define "github.com/DeepinProxy/Define"
 	"github.com/godbus/dbus"
@@ -41,8 +40,7 @@ func NewAppProxy() *AppProxy {
 	// load config
 	appModule.loadConfig()
 
-	// init cgroup
-	_ = appModule.initCGroup()
+
 	apps := appModule.Proxies.ProxyProgram
 	appModule.addCGroupExes(apps)
 
@@ -51,8 +49,6 @@ func NewAppProxy() *AppProxy {
 
 	return appModule
 }
-
-
 
 func (mgr *AppProxy) export(service *dbusutil.Service) error {
 	if service == nil {
@@ -66,78 +62,6 @@ func (mgr *AppProxy) export(service *dbusutil.Service) error {
 	}
 	return nil
 }
-
-func (mgr *AppProxy) getCGroupLevel() int {
-	return cgroup.AppProxyLevel
-}
-
-// init cgroup
-func (mgr *AppProxy) initCGroup() error {
-	//// will not error in any case
-	//err := mgr.proxyPrv.initCGroup()
-	//if err != nil {
-	//	return err
-	//}
-	//// make dir
-	//member, err := allCGroups.CreateCGroup(cgroup.AppProxyLevel, mgr.scope.String())
-	//if err != nil {
-	//	return err
-	//}
-	//mgr.cgroupMember = member
-	//logger.Debugf("[%s] create cgroup success", mgr.scope)
-	return nil
-}
-
-//// init new iptables
-//func (mgr *AppProxy) createTable() error {
-//	err := mgr.proxyPrv.initNewIptables()
-//	if err != nil {
-//		return err
-//	}
-//	mainChain := allNewIptables.GetChain("mangle", "MainEntry")
-//	if mainChain == nil {
-//		logger.Warning("main chain has no entry")
-//		return err
-//	}
-//	// check if global exist
-//	index, exist := mainChain.GetCreateChildIndex("GlobalEntry")
-//	if !exist {
-//		// correct index if not exist
-//		index = mainChain.GetRulesCount()
-//	}
-//	// command line
-//	// iptables -t mangle -I All_Entry $1 -p tcp -m cgroup --path app.slice -j App_Proxy
-//	cpl := &newIptables.CompleteRule{
-//		// -j App
-//		Action: "App",
-//		// base rules slice         -p tcp
-//		BaseSl: []newIptables.BaseRule{
-//			{
-//				Match: "p",
-//				Param: "tcp",
-//			},
-//		},
-//		// extends rules slice       -m cgroup --path app.slice -j App_Proxy
-//		ExtendsSl: []newIptables.ExtendsRule{
-//			{
-//				Match: "m",
-//				Elem: newIptables.ExtendsElem{
-//					Match: "cgroup",
-//					Base: newIptables.BaseRule{
-//						Match: "path",
-//						Param: "app.slice",
-//					},
-//				},
-//			},
-//		},
-//	}
-//	childChain, err := mainChain.CreateChild("AppEntry", index, cpl)
-//	if err != nil {
-//		return err
-//	}
-//	mgr.chains[1] = childChain
-//	return nil
-//}
 
 // add proxy app
 func (mgr *AppProxy) AddProxyApps(apps []string) *dbus.Error {

@@ -1,6 +1,26 @@
 package main
 
+import (
+	proxyDBus "github.com/DeepinProxy/DBus"
+	"log"
+)
+
 func main() {
+
+	//
+	manager := proxyDBus.NewManager()
+	// load config
+	err := manager.LoadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// export dbus service
+	err = manager.Export()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// wait
+	manager.Wait()
 	//err := bus.CreateProxyService()
 	//if err != nil {
 	//	return

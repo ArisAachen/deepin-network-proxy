@@ -22,10 +22,9 @@ type BaseProxy interface {
 	getScope() define.Scope
 
 	// get cgroup v2 level
-	getCGroupLevel() int
+	getCGroupPriority() define.Priority
 
 	// cgroup v2
-	initCGroup() error
 	addCGroupExes(procs []string)
 	delCGroupExes(procs []string)
 
@@ -36,49 +35,6 @@ type BaseProxy interface {
 	// export DBus service
 	export(service *dbusutil.Service) error
 }
-
-//func CreateProxyService() error {
-//	// get session bus
-//	service, err := dbusutil.NewSessionService()
-//	if err != nil {
-//		logger.Warningf("get session bus failed, err: %v", err)
-//		return err
-//	}
-//
-//	// export app proxy
-//	app := newProxy(tProxy.AppProxy)
-//	if app == nil {
-//		logger.Warning("app proxy init failed")
-//		return errors.New("app proxy init failed")
-//	}
-//	err = app.export(service)
-//	if err != nil {
-//		return err
-//	}
-//
-//	// export global proxy
-//	global := newProxy(tProxy.GlobalProxy)
-//	if global == nil {
-//		logger.Warning("global proxy init failed")
-//		return errors.New("global proxy init failed")
-//	}
-//	err = global.export(service)
-//	if err != nil {
-//		return err
-//	}
-//
-//	// request name
-//	err = service.RequestName(BusServiceName)
-//	if err != nil {
-//		logger.Warningf("request service failed, err: %v", err)
-//		return err
-//	}
-//
-//	logger.Debug("success export DBus service")
-//
-//	service.Wait()
-//	return nil
-//}
 
 // new proxy according to scope
 func newProxy(scope define.Scope) BaseProxy {

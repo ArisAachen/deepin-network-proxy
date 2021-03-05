@@ -3,7 +3,6 @@ package DBus
 import (
 	"fmt"
 
-	cgroup "github.com/DeepinProxy/CGroups"
 	config "github.com/DeepinProxy/Config"
 	define "github.com/DeepinProxy/Define"
 	"github.com/godbus/dbus"
@@ -41,7 +40,7 @@ func NewGlobalProxy() *GlobalProxy {
 		proxyPrv: initProxyPrv(define.Global),
 	}
 	global.loadConfig()
-	_ = global.initCGroup()
+	// _ = global.initCGroup()
 
 	// _ = global.createTable()
 	return global
@@ -60,27 +59,6 @@ func (mgr *GlobalProxy) export(service *dbusutil.Service) error {
 	return nil
 }
 
-func (mgr *GlobalProxy) initCGroup() error {
-	//// will not error in any case
-	//err := mgr.proxyPrv.initCGroup()
-	//if err != nil {
-	//	return err
-	//}
-	//// make dir
-	//member, err := allCGroups.CreateCGroup(cgroup.GlobalProxyLevel, mgr.scope)
-	//if err != nil {
-	//	return err
-	//}
-	//mgr.cgroupMember = member
-	//logger.Debugf("[%s] create cgroup success", mgr.scope)
-	return nil
-}
-
-func (mgr *GlobalProxy) getCGroupLevel() int {
-	return cgroup.GlobalProxyLevel
-}
-
-
 // add proxy app
 func (mgr *GlobalProxy) IgnoreProxyApps(apps []string) *dbus.Error {
 	mgr.proxyPrv.addCGroupExes(apps)
@@ -93,46 +71,3 @@ func (mgr *GlobalProxy) UnIgnoreProxyApps(apps []string) *dbus.Error {
 	return nil
 }
 
-//// init new iptables
-//func (mgr *GlobalProxy) createTable() error {
-//	err := mgr.proxyPrv.initNewIptables()
-//	if err != nil {
-//		return err
-//	}
-//	mainChain := allNewIptables.GetChain("mangle", "MainEntry")
-//	if mainChain == nil {
-//		logger.Warning("main chain has no entry")
-//		return err
-//	}
-//	// command line
-//	// iptables -t mangle -I All_Entry $1 -p tcp -m cgroup --path app.slice -j App_Proxy
-//	base := newIptables.BaseRule{
-//		Match: "p",
-//		Param: "tcp",
-//	}
-//	extends := newIptables.ExtendsRule{
-//		Match: "m",
-//		Elem: newIptables.ExtendsElem{
-//			Match: "cgroup",
-//			Base: newIptables.BaseRule{
-//				Match: "path",
-//				Param: "global.slice",
-//			},
-//		},
-//	}
-//	cpl := &newIptables.CompleteRule{
-//		// -j Global
-//		Action: "Global",
-//		// base rules slice         -p tcp
-//		BaseSl: []newIptables.BaseRule{base},
-//		// extends rules slice       -m cgroup !--path global.slice -j Global
-//		ExtendsSl: []newIptables.ExtendsRule{extends},
-//	}
-//	index := mainChain.GetRulesCount()
-//	childChain, err := mainChain.CreateChild("Global", index, cpl)
-//	if err != nil {
-//		return err
-//	}
-//	mgr.chains[1] = childChain
-//	return nil
-//}
