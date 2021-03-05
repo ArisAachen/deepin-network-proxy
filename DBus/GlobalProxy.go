@@ -71,15 +71,16 @@ func (mgr *GlobalProxy) ignoreProxyApps(apps []string) error {
 		if com.MegaExist(mgr.Proxies.NoProxyProgram, app) {
 			return nil
 		}
+		mgr.Proxies.NoProxyProgram = append(mgr.Proxies.NoProxyProgram, app)
+		_ = mgr.writeConfig()
+		// check if is in proxying
+		if !mgr.Enabled {
+			return nil
+		}
 		// controller
 		err := mgr.controller.UpdateFromManager(app)
 		if err != nil {
 			return dbusutil.ToError(err)
-		}
-		mgr.Proxies.NoProxyProgram = append(mgr.Proxies.NoProxyProgram, app)
-		// check if is in proxying
-		if !mgr.Enabled {
-			return nil
 		}
 		return nil
 	}
@@ -101,11 +102,6 @@ func (mgr *GlobalProxy) unIgnoreProxyApps(apps []string) error {
 		if !com.MegaExist(mgr.Proxies.NoProxyProgram, app) {
 			return nil
 		}
-		// controller
-		err := mgr.controller.ReleaseToManager(app)
-		if err != nil {
-			return dbusutil.ToError(err)
-		}
 		ifc, _, err := com.MegaDel(mgr.Proxies.NoProxyProgram, app)
 		if err != nil {
 			logger.Warningf("[%s] del proxy app %s failed, err: %v", mgr.scope, app, err)
@@ -116,6 +112,15 @@ func (mgr *GlobalProxy) unIgnoreProxyApps(apps []string) error {
 			return nil
 		}
 		mgr.Proxies.NoProxyProgram = temp
+		_ = mgr.writeConfig()
+		if !mgr.Enabled {
+			return nil
+		}
+		// controller
+		err = mgr.controller.ReleaseToManager(app)
+		if err != nil {
+			return dbusutil.ToError(err)
+		}
 		return nil
 	}
 	return nil

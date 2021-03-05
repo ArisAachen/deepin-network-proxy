@@ -173,3 +173,8 @@ func (mgr *proxyPrv) releaseRule() error {
 	}
 	return nil
 }
+
+// release controller
+func (mgr *proxyPrv) releaseController() error {
+	return mgr.controller.ReleaseAll()
+}

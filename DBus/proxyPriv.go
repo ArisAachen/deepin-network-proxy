@@ -3,7 +3,6 @@ package DBus
 import (
 	"sync"
 
-	cgroup "github.com/DeepinProxy/CGroups"
 	config "github.com/DeepinProxy/Config"
 	define "github.com/DeepinProxy/Define"
 	newCGroups "github.com/DeepinProxy/NewCGroups"
@@ -13,10 +12,6 @@ import (
 )
 
 var logger *log.Logger
-
-// use to init proxy onceCfg
-var allProxyCfg *config.ProxyConfig
-var onceCfg sync.Once
 
 const (
 	BusServiceName = "com.deepin.session.proxy"
@@ -44,9 +39,6 @@ type proxyPrv struct {
 	// handler manager
 	manager *Manager
 
-	// proxyMember to organize cgroup v2
-	cgroupMember *cgroup.CGroupMember
-
 	// cgroup controller
 	controller *newCGroups.Controller
 
@@ -57,7 +49,7 @@ type proxyPrv struct {
 	handlerMgr *tProxy.HandlerMgr
 
 	// stop chan
-	stop chan bool
+	stop *sync.Cond
 }
 
 // init proxy private
@@ -66,12 +58,67 @@ func initProxyPrv(scope define.Scope, priority define.Priority) proxyPrv {
 		scope:      scope,
 		priority:   priority,
 		handlerMgr: tProxy.NewHandlerMsg(scope),
+		stop:       sync.NewCond(&sync.Mutex{}),
 		Proxies: config.ScopeProxies{
 			Proxies:      make(map[string][]config.Proxy),
 			ProxyProgram: make([]string, 10),
 			WhiteList:    make([]string, 10),
 		},
 	}
+}
+
+// proxy prepare
+func (mgr *proxyPrv) startRedirect() error {
+	// make sure manager start init
+	mgr.manager.Start()
+
+	// create cgroups
+	err := mgr.createCGroupController()
+	if err != nil {
+		logger.Warning("[%s] create cgroup failed, err: %v", err)
+		return err
+	}
+
+	// create iptables
+	err = mgr.createTable()
+	if err != nil {
+		logger.Warning("[%s] create iptables failed, err: %v", err)
+		return err
+	}
+	err = mgr.appendRule()
+	if err != nil {
+		logger.Warning("[%s] append iptables failed, err: %v", err)
+		return err
+	}
+	logger.Debug("[%s] start tproxy iptables and cgroups success", mgr.scope)
+	return nil
+}
+
+//
+func (mgr *proxyPrv) stopRedirect() error {
+	// release iptables rules
+	err := mgr.releaseRule()
+	if err != nil {
+		logger.Warning("[%s] release iptables failed, err: %v", err)
+		return err
+	}
+
+	// release cgroups
+	err = mgr.releaseController()
+	if err != nil {
+		logger.Warning("[%s] release controller failed, err: %v", err)
+		return err
+	}
+
+	// try to release manager
+	err = mgr.manager.release()
+	if err != nil {
+		logger.Warning("[%s] release manager failed, err: %v", err)
+		return err
+	}
+
+	logger.Debug("[%s] stop tproxy iptables and cgroups success", mgr.scope)
+	return nil
 }
 
 // load config from user home dir

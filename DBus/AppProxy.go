@@ -69,15 +69,16 @@ func (mgr *AppProxy) addProxyApps(apps []string) error {
 		if com.MegaExist(mgr.Proxies.ProxyProgram, app) {
 			return nil
 		}
-		// controller
-		err := mgr.controller.UpdateFromManager(app)
-		if err != nil {
-			return dbusutil.ToError(err)
-		}
 		mgr.Proxies.ProxyProgram = append(mgr.Proxies.ProxyProgram, app)
 		// check if is in proxying
 		if !mgr.Enabled {
 			return nil
+		}
+		_ = mgr.writeConfig()
+		// controller
+		err := mgr.controller.UpdateFromManager(app)
+		if err != nil {
+			return dbusutil.ToError(err)
 		}
 		return nil
 	}
@@ -99,11 +100,7 @@ func (mgr *AppProxy) delProxyApps(apps []string) error {
 		if !com.MegaExist(mgr.Proxies.ProxyProgram, app) {
 			return nil
 		}
-		// controller
-		err := mgr.controller.ReleaseToManager(app)
-		if err != nil {
-			return dbusutil.ToError(err)
-		}
+		// mega del
 		ifc, _, err := com.MegaDel(mgr.Proxies.ProxyProgram, app)
 		if err != nil {
 			logger.Warningf("[%s] del proxy app %s failed, err: %v", mgr.scope, app, err)
@@ -114,6 +111,12 @@ func (mgr *AppProxy) delProxyApps(apps []string) error {
 			return nil
 		}
 		mgr.Proxies.ProxyProgram = temp
+		_ = mgr.writeConfig()
+		// controller
+		err = mgr.controller.ReleaseToManager(app)
+		if err != nil {
+			return dbusutil.ToError(err)
+		}
 		return nil
 	}
 	return nil

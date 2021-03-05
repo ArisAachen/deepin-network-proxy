@@ -9,8 +9,12 @@ func main() {
 
 	//
 	manager := proxyDBus.NewManager()
+	err := manager.Init()
+	if err != nil {
+		log.Fatal(err)
+	}
 	// load config
-	err := manager.LoadConfig()
+	err = manager.LoadConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -21,38 +25,4 @@ func main() {
 	}
 	// wait
 	manager.Wait()
-	//err := bus.CreateProxyService()
-	//if err != nil {
-	//	return
-	//}
-
-	//err := netlink.CreateProcsService()
-	//if err != nil {
-	//	return
-	//}
-
-	//file, err := os.Open("")
-	//if err != nil {
-	//	log.Println(err)
-	//	return
-	//}
-
-	//reader := bufio.NewReader(file)
-	//writer := bufio.NewWriter(file)
-	//
-	//rw := bufio.NewReadWriter(reader, writer)
-	//
-	//for {
-	//	line, _, err := rw.ReadLine()
-	//	if err != nil {
-	//
-	//	}
-	//
-	//	if string(line) == "" {
-	//
-	//	}
-	//
-	//}
-
-	//time.Sleep(24 * time.Hour)
 }

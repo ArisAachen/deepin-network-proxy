@@ -36,6 +36,8 @@ func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error
 		logger.Warningf("[%s] get proxy failed, err: %v", mgr.scope, err)
 		return dbusutil.ToError(err)
 	}
+	// save proxy
+	mgr.Proxy = proxy
 	logger.Debugf("[%s] get proxy success, proxy: %v", mgr.scope, proxy)
 	// tcp module
 	listen, err := mgr.listen()
@@ -57,6 +59,11 @@ func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error
 		// start proxy udp
 		go mgr.readMsgUDP(proxyTyp, proxy, packetConn)
 	}
+
+	go func() {
+		_ = mgr.startRedirect()
+	}()
+
 	// mark enable
 	mgr.Enabled = true
 
@@ -67,7 +74,12 @@ func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error
 func (mgr *proxyPrv) StopProxy() {
 	logger.Debugf("[%s] stop proxy, enable: %v, proxy: %v", mgr.scope, mgr.Enabled, mgr.Proxy)
 	// stop to break accept and read message
-	mgr.stop <- true
+	mgr.stop.Broadcast()
+
+	go func() {
+		_ = mgr.stopRedirect()
+	}()
+
 	mgr.Enabled = false
 }
 
@@ -151,10 +163,20 @@ func (mgr *proxyPrv) accept(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, listen
 		logger.Warningf("[%s] tcp listener is nil", mgr.scope)
 		return
 	}
+
+	// wait stop
+	ch := make(chan bool)
+	go func() {
+		mgr.stop.L.Lock()
+		mgr.stop.Wait()
+		mgr.stop.L.Unlock()
+		ch <- true
+	}()
+
 	// start accept until stop
 	for {
 		select {
-		case <-mgr.stop:
+		case <-ch:
 			// close all scope handler
 			mgr.handlerMgr.CloseTypHandler(proxyTyp)
 			// break accept
@@ -184,10 +206,20 @@ func (mgr *proxyPrv) readMsgUDP(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, li
 		logger.Warning("convert udp data failed")
 		return
 	}
+
+	// wait stop
+	ch := make(chan bool)
+	go func() {
+		mgr.stop.L.Lock()
+		mgr.stop.Wait()
+		mgr.stop.L.Unlock()
+		ch <- true
+	}()
+
 	// start accept until stop
 	for {
 		select {
-		case <-mgr.stop:
+		case <-ch:
 			// close all scope handler
 			mgr.handlerMgr.CloseTypHandler(proxyTyp)
 			// break accept
