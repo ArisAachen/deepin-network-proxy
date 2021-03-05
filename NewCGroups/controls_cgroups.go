@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	com "github.com/DeepinProxy/Com"
+	define "github.com/DeepinProxy/Define"
 	netlink "github.com/linuxdeepin/go-dbus-factory/com.deepin.system.procs"
 )
 
@@ -102,10 +103,10 @@ func (ctSl *ControlProcSl) CheckCtlProcExist(proc *netlink.ProcMessage) bool {
 // source controller
 type Controller struct {
 	// controller name
-	Name string // main app global
+	Name define.Scope // main app global
 
 	// Fuzzy Priority
-	Priority int
+	Priority define.Priority
 
 	// manager
 	manager *Manager
@@ -394,5 +395,5 @@ func (c *Controller) GetCGroupPath() string {
 
 // App.slice
 func (c *Controller) GetName() string {
-	return c.Name + suffix
+	return c.Name.ToString() + suffix
 }

@@ -7,11 +7,26 @@ package Define
 	2. use to create Iptables chain name
 	3. use to create cgroups controller name
 */
+type Scope string
+
 const (
-	Main   = "main"
-	App    = "app"
-	Global = "global"
+	Main   Scope = "main"
+	App    Scope = "app"
+	Global Scope = "global"
 )
+
+func (s Scope) ToString() string {
+	switch s {
+	case Main:
+		return "main"
+	case App:
+		return "app"
+	case Global:
+		return "global"
+	default:
+		return "unknown scope"
+	}
+}
 
 // proxy type
 /*
@@ -31,9 +46,11 @@ const (
 	SOCK5TCP = "sock5-tcp"
 )
 
+type Priority int
+
 // proxy priority
 const (
-	MainPriority = iota
+	MainPriority Priority = iota
 	AppPriority
 	GlobalPriority
 )

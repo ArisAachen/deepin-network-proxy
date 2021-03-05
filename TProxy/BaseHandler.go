@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 
+	define "github.com/DeepinProxy/Define"
 	"github.com/DeepinProxy/Config"
 	"pkg.deepin.io/lib/log"
 )
@@ -135,12 +136,12 @@ type HandlerMgr struct {
 	handlerMap  map[ProtoTyp]map[HandlerKey]BaseHandler // handlerMap sync.Map map[http udp]map[HandlerKey]BaseHandler
 
 	// scope [global,app]
-	scope string
+	scope define.Scope
 	// chan to stop accept
 	stop chan bool
 }
 
-func NewHandlerMsg(scope string) *HandlerMgr {
+func NewHandlerMsg(scope define.Scope) *HandlerMgr {
 	return &HandlerMgr{
 		scope:      scope,
 		handlerMap: make(map[ProtoTyp]map[HandlerKey]BaseHandler),
@@ -217,7 +218,7 @@ func (mgr *HandlerMgr) CloseAll() {
 	}
 }
 
-func NewHandler(proto ProtoTyp, scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) BaseHandler {
+func NewHandler(proto ProtoTyp, scope define.Scope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) BaseHandler {
 	// search proto
 	switch proto {
 	case HTTP:

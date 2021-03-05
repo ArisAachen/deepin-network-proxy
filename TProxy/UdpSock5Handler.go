@@ -9,6 +9,7 @@ import (
 
 	"github.com/DeepinProxy/Com"
 	"github.com/DeepinProxy/Config"
+	define "github.com/DeepinProxy/Define"
 )
 
 type UdpSock5Handler struct {
@@ -16,7 +17,7 @@ type UdpSock5Handler struct {
 	rTcpConn net.Conn
 }
 
-func NewUdpSock5Handler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *UdpSock5Handler {
+func NewUdpSock5Handler(scope define.Scope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *UdpSock5Handler {
 	// create new handler
 	handler := &UdpSock5Handler{
 		handlerPrv: createHandlerPrv(SOCK5UDP, scope, key, proxy, lAddr, rAddr, lConn),

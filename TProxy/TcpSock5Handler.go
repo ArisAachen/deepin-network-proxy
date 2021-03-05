@@ -7,13 +7,14 @@ import (
 	"net"
 
 	"github.com/DeepinProxy/Config"
+	define "github.com/DeepinProxy/Define"
 )
 
 type TcpSock5Handler struct {
 	handlerPrv
 }
 
-func NewTcpSock5Handler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *TcpSock5Handler {
+func NewTcpSock5Handler(scope define.Scope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *TcpSock5Handler {
 	// create new handler
 	handler := &TcpSock5Handler{
 		handlerPrv: createHandlerPrv(SOCK5TCP, scope, key, proxy, lAddr, rAddr, lConn),

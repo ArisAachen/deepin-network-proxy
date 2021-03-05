@@ -3,11 +3,13 @@ package Config
 import (
 	"errors"
 	"fmt"
-	"github.com/DeepinProxy/Com"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/DeepinProxy/Com"
+	define "github.com/DeepinProxy/Define"
+	"gopkg.in/yaml.v2"
 )
 
 // proxy type, support HTTP SOCK4 SOCK5
@@ -217,25 +219,25 @@ func (p *ProxyConfig) LoadPxyCfg(path string) error {
 }
 
 // get proxy by scope
-func (p *ProxyConfig) GetScopeProxies(scope string) (ScopeProxies, error) {
+func (p *ProxyConfig) GetScopeProxies(scope define.Scope) (ScopeProxies, error) {
 	// check if all proxies is nil
 	if p.AllProxies == nil {
 		return ScopeProxies{}, errors.New("all proxy config is nil")
 	}
-	proxies, ok := p.AllProxies[scope]
+	proxies, ok := p.AllProxies[scope.ToString()]
 	if !ok {
 		return ScopeProxies{}, fmt.Errorf("proxy scope [%s] cant found any proxy in all proxies map", scope)
 	}
 	return proxies, nil
 }
 
-func (p *ProxyConfig) SetScopeProxies(scope string, proxies ScopeProxies) {
+func (p *ProxyConfig) SetScopeProxies(scope define.Scope, proxies ScopeProxies) {
 	// check if all proxies is nil
 	if p.AllProxies == nil {
 		return
 	}
 	// set proxies
-	p.AllProxies[scope] = proxies
+	p.AllProxies[scope.ToString()] = proxies
 }
 
 // get proxy from config map, index: [global,app] -> [http,sock4,sock5] -> [proxy-name]

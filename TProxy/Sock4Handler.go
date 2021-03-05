@@ -8,13 +8,14 @@ import (
 	"net"
 
 	"github.com/DeepinProxy/Config"
+	define "github.com/DeepinProxy/Define"
 )
 
 type Sock4Handler struct {
 	handlerPrv
 }
 
-func NewSock4Handler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *Sock4Handler {
+func NewSock4Handler(scope define.Scope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *Sock4Handler {
 	// create new handler
 	handler := &Sock4Handler{
 		handlerPrv: createHandlerPrv(SOCK4, scope, key, proxy, lAddr, rAddr, lConn),

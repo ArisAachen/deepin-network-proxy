@@ -9,6 +9,7 @@ import (
 	cgroup "github.com/DeepinProxy/CGroups"
 	com "github.com/DeepinProxy/Com"
 	config "github.com/DeepinProxy/Config"
+	define "github.com/DeepinProxy/Define"
 	newCGroups "github.com/DeepinProxy/NewCGroups"
 	newIptables "github.com/DeepinProxy/NewIptables"
 	tProxy "github.com/DeepinProxy/TProxy"
@@ -44,7 +45,7 @@ var mainProxy []string = []string{
 }
 
 type proxyPrv struct {
-	scope tProxy.ProxyScope
+	scope define.Scope
 
 	// proxy message
 	Proxies config.ScopeProxies
@@ -53,8 +54,8 @@ type proxyPrv struct {
 	// if proxy opened
 	Enabled bool
 
-	//// handler manager
-	//manager *Manager
+	// handler manager
+	manager *Manager
 
 	// proxyMember to organize cgroup v2
 	cgroupMember *cgroup.CGroupMember
@@ -73,10 +74,10 @@ type proxyPrv struct {
 }
 
 // init proxy private
-func initProxyPrv(scope tProxy.ProxyScope) proxyPrv {
+func initProxyPrv(scope define.Scope) proxyPrv {
 	return proxyPrv{
 		scope:      scope,
-		handlerMgr: tProxy.NewHandlerMsg(scope.String()),
+		handlerMgr: tProxy.NewHandlerMsg(scope),
 		Proxies: config.ScopeProxies{
 			Proxies:      make(map[string][]config.Proxy),
 			ProxyProgram: make([]string, 10),
@@ -106,7 +107,7 @@ func (mgr *proxyPrv) loadConfig() {
 	})
 
 	// get proxies
-	mgr.Proxies, err = allProxyCfg.GetScopeProxies(mgr.scope.String())
+	mgr.Proxies, err = allProxyCfg.GetScopeProxies(mgr.scope)
 	if err != nil {
 		logger.Warningf("[%s] get proxies from global proxies failed, err: %v", mgr.scope, err)
 		return
@@ -127,7 +128,7 @@ func (mgr *proxyPrv) writeConfig() error {
 		return err
 	}
 	// set and write config
-	allProxyCfg.SetScopeProxies(mgr.scope.String(), mgr.Proxies)
+	allProxyCfg.SetScopeProxies(mgr.scope, mgr.Proxies)
 	err = allProxyCfg.WritePxyCfg(path)
 	if err != nil {
 		logger.Warningf("[%s] write config file failed, err: %v", mgr.scope, err)
@@ -177,11 +178,6 @@ func (mgr *proxyPrv) delCGroupExes(exes []string) {
 // interface path
 func (mgr *proxyPrv) GetInterfaceName() string {
 	return BusInterface
-}
-
-// rewrite export DBus path
-func (mgr *proxyPrv) getDBusPath() dbus.ObjectPath {
-	return BusPath
 }
 
 // start proxy
@@ -454,4 +450,3 @@ func (mgr *proxyPrv) proxyUdp(proxy config.Proxy, lAddr net.Addr, rAddr net.Addr
 		return
 	}
 }
-

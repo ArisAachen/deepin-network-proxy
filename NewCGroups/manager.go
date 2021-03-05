@@ -2,6 +2,7 @@ package NewCGroups
 
 import (
 	"errors"
+	define "github.com/DeepinProxy/Define"
 	"sort"
 
 	com "github.com/DeepinProxy/Com"
@@ -23,7 +24,7 @@ func NewManager() *Manager {
 }
 
 // create controller handler
-func (m *Manager) CreatePriorityController(name string, priority int) (*Controller, error) {
+func (m *Manager) CreatePriorityController(name define.Scope, priority define.Priority) (*Controller, error) {
 	if m.CheckControllerExist(name, priority) {
 		return nil, errors.New("controller name or priority already exist")
 	}
@@ -66,7 +67,7 @@ func (m *Manager) GetControllerByCtlPath(path string) *Controller {
 }
 
 // check if name controller already exist
-func (m *Manager) CheckControllerExist(name string, priority int) bool {
+func (m *Manager) CheckControllerExist(name define.Scope, priority define.Priority) bool {
 	// search name
 	for _, controller := range m.controllers {
 		if controller.Name == name || controller.Priority == priority {

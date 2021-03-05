@@ -1,16 +1,10 @@
 package main
 
-import (
-	"time"
-
-	bus "github.com/DeepinProxy/DBus"
-)
-
 func main() {
-	err := bus.CreateProxyService()
-	if err != nil {
-		return
-	}
+	//err := bus.CreateProxyService()
+	//if err != nil {
+	//	return
+	//}
 
 	//err := netlink.CreateProcsService()
 	//if err != nil {
@@ -40,5 +34,5 @@ func main() {
 	//
 	//}
 
-	time.Sleep(24 * time.Hour)
+	//time.Sleep(24 * time.Hour)
 }

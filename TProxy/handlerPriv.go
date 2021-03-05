@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/DeepinProxy/Config"
+	define "github.com/DeepinProxy/Define"
 )
 
 // handler private, data of handler
@@ -17,7 +18,7 @@ type handlerPrv struct {
 	typ ProtoTyp
 
 	// config message
-	scope ProxyScope
+	scope define.Scope
 	proxy Config.Proxy
 
 	// connection
@@ -37,7 +38,7 @@ type handlerPrv struct {
 }
 
 // new handler private
-func createHandlerPrv(typ ProtoTyp, scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) handlerPrv {
+func createHandlerPrv(typ ProtoTyp, scope define.Scope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) handlerPrv {
 	return handlerPrv{
 		// proxy typ
 		typ: typ,

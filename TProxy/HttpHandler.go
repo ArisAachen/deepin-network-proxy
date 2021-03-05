@@ -10,6 +10,7 @@ import (
 	"net/url"
 
 	"github.com/DeepinProxy/Config"
+	define "github.com/DeepinProxy/Define"
 )
 
 // tcp handler create handle bind lConn conn and rConn conn
@@ -17,7 +18,7 @@ type HttpHandler struct {
 	handlerPrv
 }
 
-func NewHttpHandler(scope ProxyScope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *HttpHandler {
+func NewHttpHandler(scope define.Scope, key HandlerKey, proxy Config.Proxy, lAddr net.Addr, rAddr net.Addr, lConn net.Conn) *HttpHandler {
 	// create new handler
 	handler := &HttpHandler{
 		handlerPrv: createHandlerPrv(HTTP, scope, key, proxy, lAddr, rAddr, lConn),

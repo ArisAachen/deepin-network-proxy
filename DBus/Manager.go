@@ -64,7 +64,7 @@ func (m *Manager) Export() error {
 	// app
 	appProxy := NewAppProxy()
 	// create cgroups controller
-	appController, err := m.controllerMgr.CreatePriorityController(appProxy.scope.String(), appProxy.getCGroupLevel())
+	appController, err := m.controllerMgr.CreatePriorityController(define.App, define.AppPriority)
 	if err != nil {
 		logger.Warningf("create app proxy controller failed, err: %v", err)
 		return err
@@ -81,7 +81,7 @@ func (m *Manager) Export() error {
 
 	// global
 	globalProxy := NewGlobalProxy()
-	globalController, err := m.controllerMgr.CreatePriorityController(globalProxy.scope.String(), globalProxy.getCGroupLevel())
+	globalController, err := m.controllerMgr.CreatePriorityController(define.Global, define.GlobalPriority)
 	if err != nil {
 		logger.Warningf("create global proxy controller failed, err: %v", err)
 		return err
@@ -127,7 +127,7 @@ func (m *Manager) initIptables() error {
 	// create main chain to manager all children chain
 	// sudo iptables -t mangle -N Main
 	// sudo iptables -t mangle -A OUTPUT -j main
-	m.mainChain, err = outputChain.CreateChild(define.Main, 0, &newIptables.CompleteRule{Action: define.Main})
+	m.mainChain, err = outputChain.CreateChild(define.Main.ToString(), 0, &newIptables.CompleteRule{Action: define.Main.ToString()})
 
 	// mainChain add default rule
 	// iptables -t mangle -A All_Entry -m cgroup --path main.slice -j RETURN
@@ -139,7 +139,7 @@ func (m *Manager) initIptables() error {
 			// cgroup
 			Match: "cgroup",
 			// --path main.slice
-			Base: newIptables.BaseRule{Match: "path", Param: define.Main + ".slice"},
+			Base: newIptables.BaseRule{Match: "path", Param: define.Main.ToString() + ".slice"},
 		},
 	}
 	// one complete rule
@@ -163,7 +163,6 @@ func (m *Manager) initCGroups() error {
 	if err != nil {
 		return err
 	}
-
 
 	return nil
 }
@@ -209,8 +208,17 @@ func (m *Manager) Listen() error {
 	return nil
 }
 
+//// release iptables rule
+//func (m *Manager) releaseRules() error {
+//
+//	if m.mainChain.GetChildrenCount() == 0 {
+//
+//	}
+//	return nil
+//}
+
 // release all source
-func (m *Manager) Release() error {
+func (m *Manager) release() error {
 	// check if all app and global proxy has stopped
 	if m.mainChain.GetChildrenCount() != 0 {
 		return nil

@@ -3,67 +3,123 @@ package DBus
 import (
 	"errors"
 	"fmt"
-	"strconv"
-	"sync"
-
-	cgroup "github.com/DeepinProxy/CGroups"
+	define "github.com/DeepinProxy/Define"
 	newIptables "github.com/DeepinProxy/NewIptables"
+	"strconv"
 )
 
 // init iptables, may include read origin iptables later
 func (mgr *proxyPrv) initNewIptables() error {
-	// init once
-	if onceNewTb == nil {
-		// reset once to init func once
-		onceNewTb = new(sync.Once)
-	}
+	//// init once
+	//if onceNewTb == nil {
+	//	// reset once to init func once
+	//	onceNewTb = new(sync.Once)
+	//}
+	//
+	//onceNewTb.Do(func() {
+	//	logger.Debug("once new iptables")
+	//	// init  iptables manager once
+	//	allNewIptables = newIptables.NewManager()
+	//	// init once
+	//	allNewIptables.Init()
+	//	// create mangle output
+	//	outputChain := allNewIptables.GetChain("mangle", "OUTPUT")
+	//	// create child chain under output chain
+	//	mainChain, err := outputChain.CreateChild("MainEntry", 0, &newIptables.CompleteRule{Action: "MainEntry"})
+	//	if err != nil {
+	//		logger.Warningf("[%s] create main chain failed, err: %v", mgr.scope, err)
+	//		return
+	//	}
+	//	// mainChain add default rule
+	//	// iptables -t mangle -A All_Entry -m cgroup --path main.slice -j RETURN
+	//	extends := newIptables.ExtendsRule{
+	//		// -m
+	//		Match: "m",
+	//		// cgroup --path main.slice
+	//		Elem: newIptables.ExtendsElem{
+	//			// cgroup
+	//			Match: "cgroup",
+	//			// --path main.slice
+	//			Base: newIptables.BaseRule{Match: "path", Param: cgroup.MainGRP + ".slice"},
+	//		},
+	//	}
+	//	// one complete rule
+	//	cpl := &newIptables.CompleteRule{
+	//		// -j RETURN
+	//		Action: newIptables.RETURN,
+	//		BaseSl: nil,
+	//		// -m cgroup --path main.slice -j RETURN
+	//		ExtendsSl: []newIptables.ExtendsRule{extends},
+	//	}
+	//	// append rule
+	//	err = mainChain.AppendRule(cpl)
+	//	return
+	//})
+	//// all app or global proxy has the mangle PREROUTING chain
+	//chain := allNewIptables.GetChain("mangle", "PREROUTING")
+	//if chain == nil {
+	//	logger.Warningf("[%s] has no mangle PREROUTING chain", mgr.scope)
+	//	return errors.New("has no mangle PREROUTING chain")
+	//}
+	//mgr.chains[0] = chain
+	return nil
+}
 
-	onceNewTb.Do(func() {
-		logger.Debug("once new iptables")
-		// init  iptables manager once
-		allNewIptables = newIptables.NewManager()
-		// init once
-		allNewIptables.Init()
-		// create mangle output
-		outputChain := allNewIptables.GetChain("mangle", "OUTPUT")
-		// create child chain under output chain
-		mainChain, err := outputChain.CreateChild("MainEntry", 0, &newIptables.CompleteRule{Action: "MainEntry"})
-		if err != nil {
-			logger.Warningf("[%s] create main chain failed, err: %v", mgr.scope, err)
-			return
-		}
-		// mainChain add default rule
-		// iptables -t mangle -A All_Entry -m cgroup --path main.slice -j RETURN
-		extends := newIptables.ExtendsRule{
-			// -m
-			Match: "m",
-			// cgroup --path main.slice
-			Elem: newIptables.ExtendsElem{
-				// cgroup
-				Match: "cgroup",
-				// --path main.slice
-				Base: newIptables.BaseRule{Match: "path", Param: cgroup.MainGRP + ".slice"},
-			},
-		}
-		// one complete rule
-		cpl := &newIptables.CompleteRule{
-			// -j RETURN
-			Action: newIptables.RETURN,
-			BaseSl: nil,
-			// -m cgroup --path main.slice -j RETURN
-			ExtendsSl: []newIptables.ExtendsRule{extends},
-		}
-		// append rule
-		err = mainChain.AppendRule(cpl)
-		return
-	})
+// create tables
+func (mgr *proxyPrv) createTable() error {
+	// start manager to init iptables and cgroups once
+	mgr.manager.Start()
+
 	// all app or global proxy has the mangle PREROUTING chain
-	chain := allNewIptables.GetChain("mangle", "PREROUTING")
+	chain := mgr.manager.iptablesMgr.GetChain("mangle", "PREROUTING")
 	if chain == nil {
 		logger.Warningf("[%s] has no mangle PREROUTING chain", mgr.scope)
 		return errors.New("has no mangle PREROUTING chain")
 	}
 	mgr.chains[0] = chain
+
+	// get index, default append at last
+	index := mgr.manager.mainChain.GetRulesCount()
+	// correct index when is app proxy
+	if mgr.scope == define.App {
+		pos, exist := mgr.manager.mainChain.GetCreateChildIndex(define.Global.ToString())
+		if exist {
+			index = pos
+		}
+	}
+	// command line
+	// iptables -t mangle -I main $1 -p tcp -m cgroup --path app.slice/global.slice -j app/global
+	cpl := &newIptables.CompleteRule{
+		// -j app/global
+		Action: mgr.scope.ToString(),
+		// base rules slice         -p tcp
+		BaseSl: []newIptables.BaseRule{
+			{
+				Match: "p",
+				Param: "tcp",
+			},
+		},
+		// extends rules slice       -m cgroup --path app.slice/global.slice
+		ExtendsSl: []newIptables.ExtendsRule{
+			{
+				Match: "m",
+				Elem: newIptables.ExtendsElem{
+					Match: "cgroup",
+					Base: newIptables.BaseRule{
+						Match: "path",
+						Param: mgr.controller.GetName(),
+					},
+				},
+			},
+		},
+	}
+	// child chain
+	childChain, err := mgr.manager.mainChain.CreateChild(mgr.scope.ToString(), index, cpl)
+	if err != nil {
+		return err
+	}
+	// save chain
+	mgr.chains[1] = childChain
 	return nil
 }
 
@@ -173,22 +229,25 @@ func (mgr *proxyPrv) releaseRule() error {
 		return err
 	}
 
-	// get main chain
-	mainChain := allNewIptables.GetChain("mangle", "MainEntry")
-	if mainChain == nil {
-		return nil
-	}
-	// check if has children, if not delete self
-	if mainChain.GetChildrenCount() == 0 {
-		// remove self
-		err = mainChain.Remove()
-		if err != nil {
-			logger.Warningf("[%s] remove main chain failed, err: %v", mgr.scope, err)
-			return err
-		}
-		// reset
-		onceNewTb = nil
-		allNewIptables = nil
-	}
+	// try to release all source
+	err = mgr.manager.release()
+
+	//// get main chain
+	//mainChain := allNewIptables.GetChain("mangle", "MainEntry")
+	//if mainChain == nil {
+	//	return nil
+	//}
+	//// check if has children, if not delete self
+	//if mainChain.GetChildrenCount() == 0 {
+	//	// remove self
+	//	err = mainChain.Remove()
+	//	if err != nil {
+	//		logger.Warningf("[%s] remove main chain failed, err: %v", mgr.scope, err)
+	//		return err
+	//	}
+	//	// reset
+	//	onceNewTb = nil
+	//	allNewIptables = nil
+	//}
 	return nil
 }
