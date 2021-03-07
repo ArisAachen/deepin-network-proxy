@@ -57,7 +57,7 @@ func NewManager() *Manager {
 // inti manager
 func (m *Manager) Init() error {
 	// init session dbus service to export service
-	sesService, err := dbusutil.NewSessionService()
+	sesService, err := dbusutil.NewSystemService()
 	if err != nil {
 		logger.Warningf("init dbus session service failed, err:  %v", err)
 		return err
@@ -204,7 +204,9 @@ func (m *Manager) initIptables() error {
 			// cgroup
 			Match: "cgroup",
 			// --path main.slice
-			Base: newIptables.BaseRule{Match: "path", Param: define.Main.ToString() + ".slice"},
+			Base: newIptables.BaseRule{
+				Match: "path", Param: define.Main.ToString() + ".slice",
+			},
 		},
 	}
 	// one complete rule
@@ -242,8 +244,13 @@ func (m *Manager) initCGroups() error {
 func (m *Manager) initRoute() error {
 	var err error
 	m.routeMgr = route.NewManager()
-	node := route.RouteNodeSpec{}
-	info := route.RouteInfoSpec{}
+	node := route.RouteNodeSpec{
+		Type:   "local",
+		Prefix: "default",
+	}
+	info := route.RouteInfoSpec{
+		Dev: "lo",
+	}
 	m.mainRoute, err = m.routeMgr.CreateRoute("100", node, info)
 	if err != nil {
 		logger.Warningf("init route failed, err: %v", err)
@@ -289,6 +296,9 @@ func (m *Manager) Listen() error {
 	_, err := m.procsService.ConnectExecProc(func(execPath string, cwdPath string, pid string) {
 		// search controller according to exe path, get highest priority one
 		controller := m.controllerMgr.GetControllerByCtlPath(execPath)
+		if controller == nil {
+			return
+		}
 		proc := &netlink.ProcMessage{
 			ExecPath: execPath,
 			Pid:      pid,
@@ -306,6 +316,9 @@ func (m *Manager) Listen() error {
 	_, err = m.procsService.ConnectExitProc(func(execPath string, cwdPath string, pid string) {
 		// search controller according to exe path
 		controller := m.controllerMgr.GetControllerByCtlPath(execPath)
+		if controller == nil {
+			return
+		}
 		proc := &netlink.ProcMessage{
 			ExecPath: execPath,
 			Pid:      pid,

@@ -91,7 +91,7 @@ func (mgr *proxyPrv) startRedirect() error {
 	}
 	err = mgr.appendRule()
 	if err != nil {
-		logger.Warning("[%s] append iptables failed, err: %v", err)
+		logger.Warning("[%s] append iptables failed, err: %v", mgr.scope, err)
 		return err
 	}
 

@@ -94,7 +94,7 @@ func (r *Route) action(action action) ([]byte, error) {
 		args = append(args, "table", r.table)
 	}
 	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
-	logger.Debugf("[%s] begin to run command %s", cmd.String())
+	logger.Debugf("[%s] begin to run command %s", r.table, cmd.String())
 	return cmd.CombinedOutput()
 }
 

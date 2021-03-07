@@ -207,7 +207,7 @@ func (c *Chain) AppendRule(cpl *CompleteRule) error {
 	// clear self chain
 	err := c.table.runCommand(Append, c, 0, cpl)
 	if err != nil {
-		logger.Warningf("[%s] chain %s flush failed", c.table.Name, c.Name, err)
+		logger.Warningf("[%s] chain %s flush failed, err: %v", c.table.Name, c.Name, err)
 		return err
 	}
 	c.cplRuleSl = append(c.cplRuleSl, cpl)

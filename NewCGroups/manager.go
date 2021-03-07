@@ -50,7 +50,7 @@ func (m *Manager) CreatePriorityController(name define.Scope, priority define.Pr
 		}
 		return true
 	})
-	return nil, nil
+	return controller, nil
 }
 
 // get controller by control app path

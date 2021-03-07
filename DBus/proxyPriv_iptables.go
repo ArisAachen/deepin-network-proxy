@@ -48,10 +48,7 @@ func (mgr *proxyPrv) createTable() error {
 				Match: "m",
 				Elem: newIptables.ExtendsElem{
 					Match: "cgroup",
-					Base: newIptables.BaseRule{
-						Match: "path",
-						Param: mgr.controller.GetName(),
-					},
+					Base:  newIptables.BaseRule{Match: "path", Param: mgr.controller.GetName()},
 				},
 			},
 		},
@@ -98,8 +95,21 @@ func (mgr *proxyPrv) appendRule() error {
 		logger.Warningf("[%s] cant add rule, chain is nil", mgr.scope)
 		return errors.New("chain is nil")
 	}
-	// iptables -t mangle -A PREROUTING -j TPROXY -m mark --mark $2
-	extends := newIptables.ExtendsRule{
+	// iptables -t mangle -A PREROUTING -j TPROXY -m mark --mark $2 --on-port 8080
+	protoExtends := newIptables.ExtendsRule{
+		// -m
+		Match: "p",
+		// mark --mark $2
+		Elem: newIptables.ExtendsElem{
+			// mark
+			Match: "tcp",
+			// --mark $2
+			Base: newIptables.BaseRule{
+				Match: "on-port", Param: strconv.Itoa(mgr.Proxies.TPort),
+			},
+		},
+	}
+	markExtends := newIptables.ExtendsRule{
 		// -m
 		Match: "m",
 		// mark --mark $2
@@ -107,7 +117,9 @@ func (mgr *proxyPrv) appendRule() error {
 			// mark
 			Match: "mark",
 			// --mark $2
-			Base: newIptables.BaseRule{Match: "mark", Param: strconv.Itoa(mgr.Proxies.TPort)},
+			Base: newIptables.BaseRule{
+				Match: "mark", Param: strconv.Itoa(mgr.Proxies.TPort),
+			},
 		},
 	}
 	// one complete rule
@@ -116,7 +128,7 @@ func (mgr *proxyPrv) appendRule() error {
 		Action: newIptables.TPROXY,
 		BaseSl: nil,
 		// -m mark --mark $2
-		ExtendsSl: []newIptables.ExtendsRule{extends},
+		ExtendsSl: []newIptables.ExtendsRule{protoExtends, markExtends},
 	}
 	// append
 	err = defChain.AppendRule(cpl)
@@ -155,7 +167,9 @@ func (mgr *proxyPrv) releaseRule() error {
 			// mark
 			Match: "mark",
 			// --mark $2
-			Base: newIptables.BaseRule{Match: "mark", Param: strconv.Itoa(mgr.Proxies.TPort)},
+			Base: newIptables.BaseRule{
+				Match: "mark", Param: strconv.Itoa(mgr.Proxies.TPort),
+			},
 		},
 	}
 	// one complete rule
