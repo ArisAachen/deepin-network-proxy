@@ -131,8 +131,8 @@ func (r *Route) Remove() error {
 	return nil
 }
 
-func (r *Route) CreateRule(ruleAction RuleAction, selector RuleSelector) error {
-	rule := Rule{
+func (r *Route) CreateRule(ruleAction RuleAction, selector RuleSelector) (*Rule, error) {
+	rule := &Rule{
 		route:        r,
 		ruleAction:   ruleAction,
 		ruleSelector: selector,
@@ -140,10 +140,10 @@ func (r *Route) CreateRule(ruleAction RuleAction, selector RuleSelector) error {
 	buf, err := rule.create()
 	if err != nil {
 		logger.Warningf("[%s] create rule failed, out: %s, err: %v", r.table, string(buf), err)
-		return err
+		return nil, err
 	}
 	logger.Debugf("[%s] create rule success", r.table)
-	return nil
+	return rule, nil
 }
 
 // rule selector

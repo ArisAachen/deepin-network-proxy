@@ -17,10 +17,18 @@ func NewManager() *Manager {
 }
 
 // create route
-func (m *Manager) CreateRoute(node RouteNodeSpec, info RouteInfoSpec) (*Route, error) {
-
-
-	return nil, nil
+func (m *Manager) CreateRoute(name string, node RouteNodeSpec, info RouteInfoSpec) (*Route, error) {
+	// create route
+	route := &Route{
+		table: name,
+		Node:  node,
+		Info:  info,
+	}
+	err := route.create()
+	if err != nil {
+		return nil, err
+	}
+	return route, nil
 }
 
 func init() {

@@ -8,6 +8,7 @@ import (
 
 	config "github.com/DeepinProxy/Config"
 	define "github.com/DeepinProxy/Define"
+	route "github.com/DeepinProxy/IpRoute"
 	newCGroups "github.com/DeepinProxy/NewCGroups"
 	newIptables "github.com/DeepinProxy/NewIptables"
 	netlink "github.com/linuxdeepin/go-dbus-factory/com.deepin.system.procs"
@@ -36,6 +37,10 @@ type Manager struct {
 	// iptables manager
 	mainChain   *newIptables.Chain // main attach chain
 	iptablesMgr *newIptables.Manager
+
+	// route manager
+	mainRoute *route.Route
+	routeMgr  *route.Manager
 
 	// if current listening
 	runOnce *sync.Once
@@ -159,16 +164,15 @@ func (m *Manager) Start() {
 	}
 	m.runOnce.Do(func() {
 		// init cgroups
-		err := m.initCGroups()
-		if err != nil {
-			logger.Warning("init cgroup failed, err: %v", err)
-		}
+		_ = m.initCGroups()
+
 		// iptables init
-		err = m.initIptables()
-		if err != nil {
-			logger.Warning("init iptables failed, err: %v", err)
-		}
-		err = m.Listen()
+		_ = m.initIptables()
+
+		// init route
+		_ = m.initRoute()
+
+		err := m.Listen()
 		if err != nil {
 			logger.Warning("init iptables failed, err: %v", err)
 		}
@@ -186,7 +190,10 @@ func (m *Manager) initIptables() error {
 	// sudo iptables -t mangle -N Main
 	// sudo iptables -t mangle -A OUTPUT -j main
 	m.mainChain, err = outputChain.CreateChild(define.Main.ToString(), 0, &newIptables.CompleteRule{Action: define.Main.ToString()})
-
+	if err != nil {
+		logger.Warningf("init iptables failed, err: %v", err)
+		return err
+	}
 	// mainChain add default rule
 	// iptables -t mangle -A All_Entry -m cgroup --path main.slice -j RETURN
 	extends := newIptables.ExtendsRule{
@@ -210,6 +217,11 @@ func (m *Manager) initIptables() error {
 	}
 	// append rule
 	err = m.mainChain.AppendRule(cpl)
+	if err != nil {
+		logger.Warningf("init iptables failed, err: %v", err)
+		return err
+	}
+	logger.Debug("init iptables success")
 	return err
 }
 
@@ -219,8 +231,25 @@ func (m *Manager) initCGroups() error {
 	var err error
 	m.mainController, err = m.controllerMgr.CreatePriorityController(define.Main, define.MainPriority)
 	if err != nil {
+		logger.Warningf("init cgroup failed, err: %v", err)
 		return err
 	}
+	logger.Debug("init cgroup success")
+	return nil
+}
+
+// init route
+func (m *Manager) initRoute() error {
+	var err error
+	m.routeMgr = route.NewManager()
+	node := route.RouteNodeSpec{}
+	info := route.RouteInfoSpec{}
+	m.mainRoute, err = m.routeMgr.CreateRoute("100", node, info)
+	if err != nil {
+		logger.Warningf("init route failed, err: %v", err)
+		return err
+	}
+	logger.Debug("init route success")
 	return nil
 }
 
@@ -312,6 +341,7 @@ func (m *Manager) release() error {
 		logger.Warningf("[manager] remove main chain failed, err: %v", err)
 		return err
 	}
+	m.iptablesMgr = nil
 
 	// release all control procs
 	err = m.mainController.ReleaseAll()
@@ -319,6 +349,15 @@ func (m *Manager) release() error {
 		logger.Warning("[manager] release all control procs failed, err:", err)
 		return err
 	}
+	m.controllerMgr = nil
+
+	// remove all route
+	err = m.mainRoute.Remove()
+	if err != nil {
+		logger.Warning("[manager] remove all route failed, err:", err)
+		return err
+	}
+	m.routeMgr = nil
 
 	// reset once
 	m.runOnce = nil

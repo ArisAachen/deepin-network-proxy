@@ -1,6 +1,7 @@
 package DBus
 
 import (
+	"github.com/DeepinProxy/IpRoute"
 	"sync"
 
 	config "github.com/DeepinProxy/Config"
@@ -44,6 +45,9 @@ type proxyPrv struct {
 
 	// iptables chain rule slice[2]
 	chains [2]*newIptables.Chain
+
+	// route rule
+	ipRule *IpRoute.Rule
 
 	// handler manager
 	handlerMgr *tProxy.HandlerMgr
@@ -90,7 +94,13 @@ func (mgr *proxyPrv) startRedirect() error {
 		logger.Warning("[%s] append iptables failed, err: %v", err)
 		return err
 	}
-	logger.Debug("[%s] start tproxy iptables and cgroups success", mgr.scope)
+
+	err = mgr.createIpRule()
+	if err != nil {
+		logger.Warning("[%s] create ip rule failed, err: %v", err)
+		return err
+	}
+	logger.Debugf("[%s] start tproxy iptables cgroups ipRule success", mgr.scope)
 
 	// first adjust cgroups
 	err = mgr.firstAdjustCGroups()
@@ -118,6 +128,11 @@ func (mgr *proxyPrv) stopRedirect() error {
 		return err
 	}
 
+	err = mgr.createIpRule()
+	if err != nil {
+		logger.Warning("[%s] release ipRule failed, err: %v", err)
+	}
+
 	// try to release manager
 	err = mgr.manager.release()
 	if err != nil {
@@ -125,7 +140,7 @@ func (mgr *proxyPrv) stopRedirect() error {
 		return err
 	}
 
-	logger.Debug("[%s] stop tproxy iptables and cgroups success", mgr.scope)
+	logger.Debug("[%s] stop tproxy iptables cgroups ipRule success", mgr.scope)
 	return nil
 }
 
