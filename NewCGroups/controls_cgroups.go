@@ -45,7 +45,7 @@ func (ctSl *ControlProcSl) Attach(path string) error {
 			logger.Warningf("[%s] attach %s back to new cgroups %s failed, err: %v", ctrl.ExecPath, ctrl.Pid, path, err)
 			return err
 		}
-		logger.Debugf("[%s] attach %s back to new cgroups %s success", ctrl.ExecPath, ctrl.Pid, path)
+		logger.Debugf("[%s] attach %s to new cgroups %s success", ctrl.ExecPath, ctrl.Pid, path)
 	}
 	return nil
 }

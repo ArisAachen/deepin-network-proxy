@@ -30,6 +30,11 @@ func (mgr *proxyPrv) createTable() error {
 			index = pos
 		}
 	}
+	var mark bool
+	if mgr.scope == define.Global {
+		mark = true
+	}
+
 	// command line
 	// iptables -t mangle -I main $1 -p tcp -m cgroup --path app.slice/global.slice -j app/global
 	cpl := &newIptables.CompleteRule{
@@ -48,7 +53,7 @@ func (mgr *proxyPrv) createTable() error {
 				Match: "m",
 				Elem: newIptables.ExtendsElem{
 					Match: "cgroup",
-					Base:  newIptables.BaseRule{Match: "path", Param: mgr.controller.GetName()},
+					Base:  newIptables.BaseRule{Mark: mark, Match: "path", Param: mgr.controller.GetName()},
 				},
 			},
 		},

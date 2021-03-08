@@ -182,6 +182,8 @@ func (m *Manager) Start() {
 		if err != nil {
 			logger.Warning("init iptables failed, err: %v", err)
 		}
+
+		_ = m.firstAdjustCGroups()
 	})
 }
 
@@ -288,10 +290,12 @@ func (m *Manager) GetAllProcs() (map[string]newCGroups.ControlProcSl, error) {
 		// if not exist, add one
 		if !ok {
 			ctrlProcSl = newCGroups.ControlProcSl{}
-			ctrlProcMap[execPath] = ctrlProcSl
+			// ctrlProcMap[execPath] = ctrlProcSl
 		}
 		// append
-		ctrlProcSl = append(ctrlProcSl, &proc)
+		var temp netlink.ProcMessage = proc
+		ctrlProcSl = append(ctrlProcSl, &temp)
+		ctrlProcMap[execPath] = ctrlProcSl
 	}
 	return ctrlProcMap, nil
 }
@@ -401,5 +405,44 @@ func (m *Manager) firstClear() error {
 		return err
 	}
 	logger.Debugf("[%s] run first clean script success", "manager")
+	return nil
+}
+
+// first adjust cgroups
+func (m *Manager) firstAdjustCGroups() error {
+	// get all procs message
+	procsMap, err := m.GetAllProcs()
+	if err != nil {
+		return err
+	}
+
+	// add map
+	for path, procSl := range procsMap {
+		// check if exist
+		if !com.MegaExist(mainProxy, path) {
+			logger.Debugf("[%s] dont need add %s at first", "manager", path)
+			continue
+		}
+		// check if already exist
+		controller := m.controllerMgr.GetControllerByCtlPath(path)
+		if controller == nil {
+			// add path
+			m.mainController.AddCtlAppPath(path)
+			err := m.mainController.MoveIn(path, procSl)
+			if err != nil {
+				logger.Warning("[%s] add procs %s at first failed, err: %v", "manager", path, err)
+				continue
+			}
+			logger.Debugf("[%s] add procs %s at first success", "manager", path)
+		} else {
+			err = m.mainController.UpdateFromManager(path)
+			if err != nil {
+				logger.Warning("[%s] add proc %s from %s at first failed, err: %v", "manager", path, controller.Name, err)
+			} else {
+				logger.Debugf("[%s] add proc %s from %s at first failed", "manager", path, controller.Name)
+			}
+			m.mainController.AddCtlAppPath(path)
+		}
+	}
 	return nil
 }

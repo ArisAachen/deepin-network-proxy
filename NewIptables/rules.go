@@ -73,7 +73,11 @@ type ExtendsElem struct {
 
 // make string    mark --mark 1
 func (elem *ExtendsElem) String() string {
-	sl := []string{elem.Match, "--" + elem.Base.Match, elem.Base.Param}
+	sl := []string{elem.Match}
+	if elem.Base.Mark {
+		sl = append(sl, "!")
+	}
+	sl = append(sl, "--"+elem.Base.Match, elem.Base.Param)
 	return strings.Join(sl, " ")
 }
 
