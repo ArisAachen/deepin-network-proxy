@@ -4,6 +4,7 @@ import (
 	"errors"
 	com "github.com/DeepinProxy/Com"
 	"os"
+	"path/filepath"
 	"sync"
 
 	config "github.com/DeepinProxy/Config"
@@ -87,6 +88,7 @@ func (m *Manager) LoadConfig() error {
 		logger.Warningf("failed to get user home dir, user:%v, err: %v", os.Geteuid(), err)
 		return err
 	}
+	path = filepath.Join(path, define.ConfigName)
 	// config
 	m.config = config.NewProxyCfg()
 	err = m.config.LoadPxyCfg(path)
@@ -105,6 +107,7 @@ func (m *Manager) WriteConfig() error {
 		logger.Warningf("[manager] get user home dir failed, user:%v, err: %v", os.Geteuid(), err)
 		return err
 	}
+	path = filepath.Join(path, define.ConfigName)
 	err = m.config.WritePxyCfg(path)
 	if err != nil {
 		logger.Warningf("[manager] write config file failed, err: %v", err)
@@ -163,6 +166,9 @@ func (m *Manager) Start() {
 		m.runOnce = new(sync.Once)
 	}
 	m.runOnce.Do(func() {
+		// run first clean script
+		_ = m.firstClear()
+
 		// init cgroups
 		_ = m.initCGroups()
 
@@ -374,5 +380,26 @@ func (m *Manager) release() error {
 
 	// reset once
 	m.runOnce = nil
+	return nil
+}
+
+// run first clean script
+func (m *Manager) firstClear() error {
+	// get config path
+	path, err := com.GetUserConfigDir()
+	if err != nil {
+		logger.Warningf("[%s] run first clean failed, config err: %v", "manager", err)
+		return err
+	}
+	// get script file path
+	path = filepath.Join(path, define.ScriptName)
+	// run script
+	buf, err := com.RunScript(path, []string{"clear_main"})
+	if err != nil {
+		// dont need to delete always
+		logger.Debugf("[%s] run first clean script failed, out: %s, err: %v", "manager", string(buf), err)
+		return err
+	}
+	logger.Debugf("[%s] run first clean script success", "manager")
 	return nil
 }

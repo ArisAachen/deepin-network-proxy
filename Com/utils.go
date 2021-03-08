@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"reflect"
@@ -25,8 +27,7 @@ import (
 const (
 	SoOriginalDst    = 80
 	Ip6SoOriginalDst = 80 // from linux/include/uapi/linux/netfilter_ipv6/ip6_tables.h
-	ConfigPath       = ".config/deepin-proxy/proxy.yaml"
-	ProxyActionId    = "com.deepin.system.proxy"
+	ConfigPath       = ".config/deepin-proxy"
 )
 
 // get origin destination addr
@@ -560,4 +561,17 @@ func ParseCGroup2FromBuf(in []byte) []byte {
 			return bytes.TrimPrefix(buf, []byte("0:"))
 		}
 	}
+}
+
+// run script
+func RunScript(path string, params []string) ([]byte, error) {
+	args := []string{path}
+	args = append(args, params...)
+	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
+	log.Println(cmd.String())
+	buf, err := cmd.CombinedOutput()
+	if err != nil {
+		return buf, err
+	}
+	return nil, nil
 }

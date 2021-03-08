@@ -1,15 +1,16 @@
 package DBus
 
 import (
-	"github.com/DeepinProxy/IpRoute"
-	"sync"
-
+	com "github.com/DeepinProxy/Com"
 	config "github.com/DeepinProxy/Config"
 	define "github.com/DeepinProxy/Define"
+	"github.com/DeepinProxy/IpRoute"
 	newCGroups "github.com/DeepinProxy/NewCGroups"
 	newIptables "github.com/DeepinProxy/NewIptables"
 	tProxy "github.com/DeepinProxy/TProxy"
+	"path/filepath"
 	"pkg.deepin.io/lib/log"
+	"sync"
 )
 
 var logger *log.Logger
@@ -76,6 +77,9 @@ func (mgr *proxyPrv) startRedirect() error {
 	// make sure manager start init
 	mgr.manager.Start()
 
+	// clean old redirect
+	_ = mgr.firstClean()
+
 	// create cgroups
 	err := mgr.createCGroupController()
 	if err != nil {
@@ -108,7 +112,7 @@ func (mgr *proxyPrv) startRedirect() error {
 		logger.Warning("[%s] first adjust controller failed, err: %v", mgr.scope, err)
 		return err
 	}
-	logger.Debug("[%s] first adjust controller success", mgr.scope)
+	logger.Debugf("[%s] first adjust controller success", mgr.scope)
 	return nil
 }
 
@@ -164,5 +168,26 @@ func (mgr *proxyPrv) writeConfig() error {
 		logger.Warning("[%s] write config failed, err:%v", mgr.scope, err)
 		return err
 	}
+	return nil
+}
+
+// first clean
+func (mgr *proxyPrv) firstClean() error {
+	// get config path
+	path, err := com.GetUserConfigDir()
+	if err != nil {
+		logger.Warningf("[%s] run first clean failed, config err: %v", mgr.scope, err)
+		return err
+	}
+	// get script file path
+	path = filepath.Join(path, define.ScriptName)
+	// run script
+	buf, err := com.RunScript(path, []string{"clear_" + mgr.scope.ToString()})
+	if err != nil {
+		// dont need to delete always
+		logger.Debugf("[%s] run first clean script failed, out: %s, err: %v", mgr.scope, string(buf), err)
+		return err
+	}
+	logger.Debugf("[%s] run first clean script success", mgr.scope)
 	return nil
 }

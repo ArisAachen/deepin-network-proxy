@@ -239,7 +239,7 @@ func (c *Controller) UpdateFromManager(path string) error {
 		}
 		return nil
 	}
-	logger.Debug("[%s] dont need update procs %s, cant find any controller", c.Name, path)
+	logger.Debugf("[%s] dont need update procs %s, cant find any controller", c.Name, path)
 	return nil
 }
 
