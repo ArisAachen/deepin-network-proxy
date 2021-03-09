@@ -71,7 +71,7 @@ func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error
 }
 
 // stop proxy
-func (mgr *proxyPrv) StopProxy() {
+func (mgr *proxyPrv) StopProxy() *dbus.Error {
 	logger.Debugf("[%s] stop proxy, enable: %v, proxy: %v", mgr.scope, mgr.Enabled, mgr.Proxy)
 	// stop to break accept and read message
 	mgr.stop.Broadcast()
@@ -81,6 +81,7 @@ func (mgr *proxyPrv) StopProxy() {
 	}()
 
 	mgr.Enabled = false
+	return nil
 }
 
 // set proxies

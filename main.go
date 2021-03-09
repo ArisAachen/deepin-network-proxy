@@ -14,10 +14,10 @@ func main() {
 		log.Fatal(err)
 	}
 	// load config
-	err = manager.LoadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+	_ = manager.LoadConfig()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 	// export dbus service
 	err = manager.Export()
 	if err != nil {

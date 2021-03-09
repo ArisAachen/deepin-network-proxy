@@ -63,6 +63,12 @@ func (mgr *AppProxy) AddProxyApps(apps []string) *dbus.Error {
 }
 
 func (mgr *AppProxy) addProxyApps(apps []string) error {
+	// get all procs message
+	procsMap, err := mgr.manager.GetAllProcs()
+	if err != nil {
+		return err
+	}
+
 	// add app
 	for _, app := range apps {
 		// check if already exist
@@ -76,10 +82,38 @@ func (mgr *AppProxy) addProxyApps(apps []string) error {
 		}
 		_ = mgr.writeConfig()
 		// controller
-		err := mgr.controller.UpdateFromManager(app)
-		if err != nil {
-			return dbusutil.ToError(err)
+
+		// get origin controller
+		controller := mgr.manager.controllerMgr.GetControllerByCtlPath(app)
+		if controller == nil {
+			// add path
+			mgr.controller.AddCtlAppPath(app)
+			// get proc message
+			procSl, ok := procsMap[app]
+			if !ok {
+				continue
+			}
+			// if not empty, move in
+			err := mgr.controller.MoveIn(app, procSl)
+			if err != nil {
+				logger.Warningf("[%s] add procs %s at add proxy apps failed, err: %v", mgr.scope, app, err)
+				continue
+			}
+			logger.Debugf("[%s] add procs %s at add proxy apps success", mgr.scope, app)
+		} else {
+			err = mgr.controller.UpdateFromManager(app)
+			if err != nil {
+				logger.Warningf("[%s] add proc %s from %s at add proxy apps failed, err: %v", mgr.scope, app, controller.Name, err)
+			} else {
+				logger.Debugf("[%s] add proc %s from %s at add proxy apps success", mgr.scope, app, controller.Name)
+			}
+			mgr.controller.AddCtlAppPath(app)
 		}
+
+		//err := mgr.controller.UpdateFromManager(app)
+		//if err != nil {
+		//	return dbusutil.ToError(err)
+		//}
 		return nil
 	}
 	return nil

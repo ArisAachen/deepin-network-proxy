@@ -225,7 +225,7 @@ func (c *Controller) UpdateFromManager(path string) error {
 	if controller != nil {
 		// dont remove, because current priority is higher
 		if controller.Priority >= c.Priority {
-			logger.Debug("[%s] dont need update procs %s, %s has higher priority", c.Name, path, controller.Priority)
+			logger.Debugf("[%s] dont need update procs %s, %s has higher priority", c.Name, path, controller.Priority)
 			return nil
 		}
 		procSl := controller.MoveOut(path)
