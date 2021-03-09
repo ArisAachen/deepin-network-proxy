@@ -279,7 +279,7 @@ func (m *Manager) GetAllProcs() (map[string]newCGroups.ControlProcSl, error) {
 	// map[pid]{pid exec cgroups}
 	procs, err := m.procsService.Procs().Get(0)
 	if err != nil {
-		logger.Warningf("[%s] get procs failed, err: %v", err)
+		logger.Warningf("[%s] get procs failed, err: %v", "manager",err)
 		return nil, err
 	}
 	// map[exec][pid exec cgroups]

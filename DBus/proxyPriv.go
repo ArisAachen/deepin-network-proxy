@@ -109,7 +109,7 @@ func (mgr *proxyPrv) startRedirect() error {
 	// first adjust cgroups
 	err = mgr.firstAdjustCGroups()
 	if err != nil {
-		logger.Warning("[%s] first adjust controller failed, err: %v", mgr.scope, err)
+		logger.Warningf("[%s] first adjust controller failed, err: %v", mgr.scope, err)
 		return err
 	}
 	logger.Debugf("[%s] first adjust controller success", mgr.scope)
@@ -121,30 +121,30 @@ func (mgr *proxyPrv) stopRedirect() error {
 	// release iptables rules
 	err := mgr.releaseRule()
 	if err != nil {
-		logger.Warning("[%s] release iptables failed, err: %v", err)
+		logger.Warningf("[%s] release iptables failed, err: %v", mgr.scope,err)
 		return err
 	}
 
 	// release cgroups
 	err = mgr.releaseController()
 	if err != nil {
-		logger.Warning("[%s] release controller failed, err: %v", err)
+		logger.Warningf("[%s] release controller failed, err: %v", mgr.scope,err)
 		return err
 	}
 
 	err = mgr.createIpRule()
 	if err != nil {
-		logger.Warning("[%s] release ipRule failed, err: %v", err)
+		logger.Warningf("[%s] release ipRule failed, err: %v",mgr.scope, err)
 	}
 
 	// try to release manager
 	err = mgr.manager.release()
 	if err != nil {
-		logger.Warning("[%s] release manager failed, err: %v", err)
+		logger.Warningf("[%s] release manager failed, err: %v", mgr.scope,err)
 		return err
 	}
 
-	logger.Debug("[%s] stop tproxy iptables cgroups ipRule success", mgr.scope)
+	logger.Debugf("[%s] stop tproxy iptables cgroups ipRule success", mgr.scope)
 	return nil
 }
 
