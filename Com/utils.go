@@ -28,6 +28,7 @@ const (
 	SoOriginalDst    = 80
 	Ip6SoOriginalDst = 80 // from linux/include/uapi/linux/netfilter_ipv6/ip6_tables.h
 	ConfigPath       = ".config/deepin-proxy"
+	cgroupPrefix     = "/sys/fs/cgroup/unified"
 )
 
 // get origin destination addr
@@ -545,7 +546,7 @@ func IsPid(pid string) bool {
 }
 
 // parse cgroup v2 message from /proc/pid/cgroup
-func ParseCGroup2FromBuf(in []byte) []byte {
+func ParseCGroup2FromBuf(in []byte) string {
 	byt := bytes.NewBuffer(in)
 	reader := bufio.NewReader(byt)
 
@@ -554,11 +555,14 @@ func ParseCGroup2FromBuf(in []byte) []byte {
 		buf, _, err := reader.ReadLine()
 		// dont care about if error if EOF
 		if err != nil {
-			return nil
+			return ""
 		}
 		// cgroup v2 message
-		if bytes.HasPrefix(buf, []byte("0:")) {
-			return bytes.TrimPrefix(buf, []byte("0:"))
+		// https://www.kernel.org/doc/Documentation/cgroup-v2.txt
+		if bytes.HasPrefix(buf, []byte("0::")) {
+			backPath := bytes.TrimPrefix(buf, []byte("0::"))
+			fullPath := filepath.Join(cgroupPrefix, string(backPath))
+			return fullPath
 		}
 	}
 }

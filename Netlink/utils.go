@@ -2,13 +2,10 @@ package Netlink
 
 import (
 	"errors"
+	com "github.com/DeepinProxy/Com"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
-
-	com "github.com/DeepinProxy/Com"
 )
 
 // get proc message
@@ -32,7 +29,7 @@ func getProcMsg(pid string) (ProcMessage, error) {
 	// proc message
 	msg := ProcMessage{
 		ExecPath:    readExecPath,
-		Cgroup2Path: string(cgroupPath),
+		Cgroup2Path: cgroupPath,
 		Pid:         pid,
 	}
 	return msg, nil
@@ -42,16 +39,16 @@ func getCPUTime() {
 
 }
 
-// use to attach pid to cgroup
-func AttachCGroup(pid string, path string) error {
-	args := []string{"echo", pid, ">", path}
-	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
-	logger.Debugf("start to attach cgroup %s", cmd.String())
-	buf, err := cmd.CombinedOutput()
-	if err != nil {
-		logger.Warningf("exec add cgroup failed, err: %v", err)
-		return err
-	}
-	logger.Debugf("result is %s", string(buf))
-	return nil
-}
+//// use to attach pid to cgroup
+//func AttachCGroup(pid string, path string) error {
+//	args := []string{"echo", pid, ">", path}
+//	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
+//	logger.Debugf("start to attach cgroup %s", cmd.String())
+//	buf, err := cmd.CombinedOutput()
+//	if err != nil {
+//		logger.Warningf("exec add cgroup failed, err: %v", err)
+//		return err
+//	}
+//	logger.Debugf("result is %s", string(buf))
+//	return nil
+//}

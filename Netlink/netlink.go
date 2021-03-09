@@ -4,14 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"strconv"
 	"sync"
 	"syscall"
 
-	com "github.com/DeepinProxy/Com"
-	"github.com/godbus/dbus"
 	"pkg.deepin.io/lib/dbusutil"
 	"pkg.deepin.io/lib/log"
 )
@@ -44,9 +41,9 @@ type ProcManager struct {
 	lAddr syscall.Sockaddr
 	kAddr syscall.Sockaddr
 
-	methods *struct {
-		ChangeCGroup func() `in:"pid,cgroup" out:"err"`
-	}
+	//methods *struct {
+	//	ChangeCGroup func() `in:"pid,cgroup" out:"err"`
+	//}
 
 	// signals
 	signals *struct {
@@ -74,27 +71,27 @@ func (p *ProcManager) GetInterfaceName() string {
 	return BusInterface
 }
 
-// change cgroup
-func (p *ProcManager) ChangeCGroup(pid string, cgroup string) *dbus.Error {
-	logger.Debugf("start to attach pid [%s] to cgroup [%s]", pid, cgroup)
-	// check if pid is num
-	if !com.IsPid(pid) {
-		logger.Warning("change cgroup pid is not num")
-		return dbusutil.ToError(errors.New("pid is not num"))
-	}
-	// try to get proc message
-	msg := p.getProc(pid)
-	if msg == nil {
-		logger.Warningf("pid [%s] not exist or has no exe path", pid)
-		return dbusutil.ToError(fmt.Errorf("pid [%s] not exist or has no exe path", pid))
-	}
-	err := AttachCGroup(pid, cgroup)
-	if err != nil {
-		logger.Warningf("attach pid [%s] to cgroup [%s] failed, err: %v", pid, cgroup, err)
-	}
-	logger.Debugf("attach pid [%s] to cgroup [%s] success", pid, cgroup)
-	return nil
-}
+//// change cgroup
+//func (p *ProcManager) ChangeCGroup(pid string, cgroup string) *dbus.Error {
+//	logger.Debugf("start to attach pid [%s] to cgroup [%s]", pid, cgroup)
+//	// check if pid is num
+//	if !com.IsPid(pid) {
+//		logger.Warning("change cgroup pid is not num")
+//		return dbusutil.ToError(errors.New("pid is not num"))
+//	}
+//	// try to get proc message
+//	msg := p.getProc(pid)
+//	if msg == nil {
+//		logger.Warningf("pid [%s] not exist or has no exe path", pid)
+//		return dbusutil.ToError(fmt.Errorf("pid [%s] not exist or has no exe path", pid))
+//	}
+//	err := AttachCGroup(pid, cgroup)
+//	if err != nil {
+//		logger.Warningf("attach pid [%s] to cgroup [%s] failed, err: %v", pid, cgroup, err)
+//	}
+//	logger.Debugf("attach pid [%s] to cgroup [%s] success", pid, cgroup)
+//	return nil
+//}
 
 // init sock
 func (p *ProcManager) initSock() error {
@@ -358,6 +355,13 @@ func CreateProcsService() error {
 		err = manager.sendMsg(C.PROC_CN_MCAST_IGNORE)
 	}()
 
+	// export bus path
+	err = service.Export(BusPath, manager)
+	if err != nil {
+		logger.Warningf("export [%] failed, err: %v", BusPath, err)
+		return err
+	}
+
 	// continue listen
 	go func() {
 		for {
@@ -368,13 +372,6 @@ func CreateProcsService() error {
 	err = manager.loadProc()
 	if err != nil {
 		logger.Warning(err)
-	}
-
-	// export bus path
-	err = service.Export(BusPath, manager)
-	if err != nil {
-		logger.Warningf("export [%] failed, err: %v", BusPath, err)
-		return err
 	}
 
 	// request service

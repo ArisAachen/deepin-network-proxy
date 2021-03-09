@@ -1,11 +1,12 @@
 package Netlink
 
 const (
-	ProcDir = "/proc"
-	exe     = "exe"
-	cwd     = "cwd"
-	cgroup  = "cgroup"
-	autoPid = 0
+	ProcDir      = "/proc"
+	exe          = "exe"
+	cwd          = "cwd"
+	cgroup       = "cgroup"
+	autoPid      = 0
+	cgroupPrefix = "/sys/fs/cgroup/unified"
 )
 
 const (
