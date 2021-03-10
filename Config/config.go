@@ -142,6 +142,9 @@ func (p *ScopeProxies) SetProxy(proto string, name string, proxy Proxy) {
 	// get proxies
 	proxies, ok := p.Proxies[proto]
 	if !ok {
+		proxies = make([]Proxy, 10)
+		proxies = append(proxies, proxy)
+		p.Proxies[proto] = proxies
 		return
 	}
 	var exist bool
@@ -156,6 +159,7 @@ func (p *ScopeProxies) SetProxy(proto string, name string, proxy Proxy) {
 	if !exist {
 		proxies = append(proxies, proxy)
 	}
+	p.Proxies[proto] = proxies
 }
 
 // proxy config

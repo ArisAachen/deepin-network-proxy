@@ -3,11 +3,11 @@
 ## clear app iptables
 clear_app_iptables(){
     ## clear app chain
-    iptables -t mangle -F app
+    iptables -t mangle -F App
     ## detach app chain from main
-    iptables -t mangle -D main -j app -p tcp -m cgroup --path app.slice
+    iptables -t mangle -D Main -j App -p tcp -m cgroup --path App.slice
     ## remove chain
-    iptables -t mangle -X app
+    iptables -t mangle -X App
 
     ## del mark rule from output chain
     iptables -t mangle -D PREROUTING -j TPROXY -p tcp --on-port 8090 -m mark --mark 8090
@@ -28,11 +28,11 @@ clear_app(){
 ## clear global iptables
 clear_global_iptables(){
    ## clear global chain
-    iptables -t mangle -F global
+    iptables -t mangle -F Global
     ## detach global chain from main
-    iptables -t mangle -D main -j global -p tcp -m cgroup --path global.slice
+    iptables -t mangle -D Main -j Global -p tcp -m cgroup --path Global.slice
     ## remove chain
-    iptables -t mangle -X global
+    iptables -t mangle -X Global
 
     ## del mark rule from output chain
     iptables -t mangle -D PREROUTING -j TPROXY -p tcp --on-port 8080 -m mark --mark 8080 
@@ -53,11 +53,11 @@ clear_global(){
 ## clear main iptables
 clear_main_iptables(){
     ## clear main rules
-    iptables -t mangle -F main
+    iptables -t mangle -F Main
     ## detach main rule from OUTPUT chain
-    iptables -t mangle -D OUTPUT -j main 
+    iptables -t mangle -D OUTPUT -j Main
     ## remove main chain
-    iptables -t mangle -X main
+    iptables -t mangle -X Main
 }
 
 ## clear main ip route
@@ -78,15 +78,15 @@ echo "begin clear" + $1
 for i in "$@"
 do
 case $i in
-    clear_main)
+    clear_Main)
         clear_main
         exit 0
         ;;
-    clear_global)
+    clear_Global)
         clear_global
         exit 0
         ;;
-    clear_app)
+    clear_App)
         clear_app
         exit 0
         ;;

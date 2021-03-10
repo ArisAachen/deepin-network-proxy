@@ -367,11 +367,11 @@ func (m *Manager) Listen() error {
 		}
 
 	})
+	m.sigLoop.Start()
 	if err != nil {
 		logger.Warningf("connect exit proc failed, err: %v")
 		return err
 	}
-	m.sigLoop.Start()
 	return nil
 }
 
@@ -426,7 +426,7 @@ func (m *Manager) firstClear() error {
 	// get script file path
 	path = filepath.Join(path, define.ScriptName)
 	// run script
-	buf, err := com.RunScript(path, []string{"clear_main"})
+	buf, err := com.RunScript(path, []string{"clear_Main"})
 	if err != nil {
 		// dont need to delete always
 		logger.Debugf("[%s] run first clean script failed, out: %s, err: %v", "manager", string(buf), err)

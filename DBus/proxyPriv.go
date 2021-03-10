@@ -23,7 +23,7 @@ const (
 
 // must ignore proxy proc
 var mainProxy []string = []string{
-	"/usr/lib/deepin-daemon/DeepinProxy",
+	"/usr/lib/deepin-daemon/dde-proxy",
 	"Qv2ray",
 }
 
