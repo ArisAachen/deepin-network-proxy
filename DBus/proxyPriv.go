@@ -59,7 +59,7 @@ type proxyPrv struct {
 
 // init proxy private
 func initProxyPrv(scope define.Scope, priority define.Priority) proxyPrv {
-	return proxyPrv{
+	prv := proxyPrv{
 		scope:      scope,
 		priority:   priority,
 		handlerMgr: tProxy.NewHandlerMsg(scope),
@@ -70,6 +70,7 @@ func initProxyPrv(scope define.Scope, priority define.Priority) proxyPrv {
 			WhiteList:    make([]string, 10),
 		},
 	}
+	return prv
 }
 
 // proxy prepare
@@ -121,26 +122,26 @@ func (mgr *proxyPrv) stopRedirect() error {
 	// release iptables rules
 	err := mgr.releaseRule()
 	if err != nil {
-		logger.Warningf("[%s] release iptables failed, err: %v", mgr.scope,err)
+		logger.Warningf("[%s] release iptables failed, err: %v", mgr.scope, err)
 		return err
 	}
 
 	// release cgroups
 	err = mgr.releaseController()
 	if err != nil {
-		logger.Warningf("[%s] release controller failed, err: %v", mgr.scope,err)
+		logger.Warningf("[%s] release controller failed, err: %v", mgr.scope, err)
 		return err
 	}
 
 	err = mgr.createIpRule()
 	if err != nil {
-		logger.Warningf("[%s] release ipRule failed, err: %v",mgr.scope, err)
+		logger.Warningf("[%s] release ipRule failed, err: %v", mgr.scope, err)
 	}
 
 	// try to release manager
 	err = mgr.manager.release()
 	if err != nil {
-		logger.Warningf("[%s] release manager failed, err: %v", mgr.scope,err)
+		logger.Warningf("[%s] release manager failed, err: %v", mgr.scope, err)
 		return err
 	}
 

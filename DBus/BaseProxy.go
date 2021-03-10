@@ -16,6 +16,8 @@ type BaseProxy interface {
 	StopProxy() *dbus.Error
 	SetProxies(proxies config.ScopeProxies) *dbus.Error
 	ClearProxies() *dbus.Error
+	GetProxy() (string, *dbus.Error)
+	AddProxy(proto string, name string, jsonProxy []byte) *dbus.Error
 
 	// manager
 	loadConfig()

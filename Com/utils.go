@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -604,4 +605,13 @@ func RunScript(path string, params []string) ([]byte, error) {
 		return buf, err
 	}
 	return nil, nil
+}
+
+// marshal json
+func MarshalJson(v interface{})(string,error){
+	buf,err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(buf),nil
 }

@@ -15,6 +15,16 @@ func (mgr *proxyPrv) GetInterfaceName() string {
 	return BusInterface + "." + mgr.scope.ToString()
 }
 
+// get proxy
+func (mgr *proxyPrv) GetProxy() (string, *dbus.Error) {
+	buf, err := com.MarshalJson(mgr.Proxy)
+	if err != nil {
+		logger.Warningf("[%s] get proxy failed, err: %v", mgr.scope, err)
+		return "",dbusutil.ToError(err)
+	}
+	return buf, nil
+}
+
 // start proxy
 func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error {
 	logger.Debugf("[%s] start proxy, proto [%s] name [%s] udp [%v]", mgr.scope, proto, name, udp)
@@ -81,6 +91,18 @@ func (mgr *proxyPrv) StopProxy() *dbus.Error {
 	}()
 
 	mgr.Enabled = false
+	return nil
+}
+
+// set proxy
+func (mgr *proxyPrv) AddProxy(proto string, name string, jsonProxy []byte) *dbus.Error {
+	proxy, err := UnMarshalProxy(jsonProxy)
+	if err != nil {
+		logger.Warningf("[%s] unmarshal proxy message failed, err: %v", mgr.scope, err)
+		return dbusutil.ToError(err)
+	}
+	// check if exist
+	mgr.Proxies.SetProxy(proto, name, proxy)
 	return nil
 }
 

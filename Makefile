@@ -31,8 +31,8 @@ install:
 	install -v -D -m644 -t ${DESTDIR}${PREFIX}/share/dbus-1/system.d misc/proxy/com.deepin.system.proxy.conf
 	install -v -D -m644 -t ${DESTDIR}${PREFIX}/share/dbus-1/system-services misc/procs/com.deepin.system.procs.service
 	install -v -D -m644 -t ${DESTDIR}${PREFIX}/share/dbus-1/system-services misc/proxy/com.deepin.system.proxy.service
-	install -v -D -m644 -t ${DESTDIR}${PREFIX}/${LIB}/${DAEMON} bin/netlink
-	install -v -D -m644 -t ${DESTDIR}${PREFIX}/${LIB}/${DAEMON} bin/dde-proxy
+	install -v -D -m755 -t ${DESTDIR}${PREFIX}/${LIB}/${DAEMON} bin/netlink
+	install -v -D -m755 -t ${DESTDIR}${PREFIX}/${LIB}/${DAEMON} bin/dde-proxy
 
 
 clean:
