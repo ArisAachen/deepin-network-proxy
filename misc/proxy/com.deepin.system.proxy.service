@@ -1,0 +1,3 @@
+[Service]
+Name=com.deepin.system.proxy
+Exec=/usr/lib/deepin-daemon/dde-proxy

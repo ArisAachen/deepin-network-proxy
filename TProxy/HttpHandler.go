@@ -55,13 +55,13 @@ func (handler *HttpHandler) Tunnel() error {
 			Host: tcpAddr.String(),
 		},
 		Header: http.Header{
-			//"Proxy-Connection": []string{"Keep-Alive"},
+			//"dde-proxy-Connection": []string{"Keep-Alive"},
 		},
 	}
 	// check if need auth
 	if auth.user != "" && auth.password != "" {
 		authMsg := auth.user + ":" + auth.password
-		req.Header.Add("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(authMsg)))
+		req.Header.Add("dde-proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(authMsg)))
 	}
 	// send connect request to rConn to create tunnel
 	err = req.Write(rConn)
