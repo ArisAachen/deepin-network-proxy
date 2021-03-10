@@ -10,19 +10,19 @@ package Define
 type Scope string
 
 const (
-	Main   Scope = "main"
-	App    Scope = "app"
-	Global Scope = "global"
+	Main   Scope = "Main"
+	App    Scope = "App"
+	Global Scope = "Global"
 )
 
 func (s Scope) ToString() string {
 	switch s {
 	case Main:
-		return "main"
+		return "Main"
 	case App:
-		return "app"
+		return "App"
 	case Global:
-		return "global"
+		return "Global"
 	default:
 		return "unknown scope"
 	}

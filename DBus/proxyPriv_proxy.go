@@ -12,7 +12,7 @@ import (
 
 // interface path
 func (mgr *proxyPrv) GetInterfaceName() string {
-	return BusInterface
+	return BusInterface + "." + mgr.scope.ToString()
 }
 
 // start proxy

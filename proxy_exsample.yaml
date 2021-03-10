@@ -1,5 +1,5 @@
 all-proxies:
-  app:
+  App:
     proxies:
       http:
       - prototype: http
@@ -50,7 +50,7 @@ all-proxies:
     - baidu.com
     - si.com
     t-port: 8090
-  global:
+  Global:
     proxies:
       http:
       - prototype: http
