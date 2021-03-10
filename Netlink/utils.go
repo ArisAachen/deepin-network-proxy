@@ -16,9 +16,14 @@ func getProcMsg(pid string) (ProcMessage, error) {
 	// get read proc path
 	exePath := filepath.Join(ProcDir, pid, exe)
 	readExecPath, _ := os.Readlink(exePath)
+	// read cgroups message
 	cgPath := filepath.Join(ProcDir, pid, cgroup)
 	buf, _ := ioutil.ReadFile(cgPath)
 	cgroupPath := com.ParseCGroup2FromBuf(buf)
+	// read ppid message
+	statusPath := filepath.Join(ProcDir, pid, status)
+	buf, _ = ioutil.ReadFile(statusPath)
+	ppid := com.ParsePPidFromBuf(buf)
 
 	// sometimes /proc/Pid/exe dont is empty link
 	if readExecPath == "" {
@@ -31,6 +36,7 @@ func getProcMsg(pid string) (ProcMessage, error) {
 		ExecPath:    readExecPath,
 		Cgroup2Path: cgroupPath,
 		Pid:         pid,
+		PPid:        ppid,
 	}
 	return msg, nil
 }

@@ -5,6 +5,7 @@ const (
 	exe          = "exe"
 	cwd          = "cwd"
 	cgroup       = "cgroup"
+	status       = "status"
 	autoPid      = 0
 	cgroupPrefix = "/sys/fs/cgroup/unified"
 )

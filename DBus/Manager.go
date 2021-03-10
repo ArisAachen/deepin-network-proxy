@@ -279,7 +279,7 @@ func (m *Manager) GetAllProcs() (map[string]newCGroups.ControlProcSl, error) {
 	// map[pid]{pid exec cgroups}
 	procs, err := m.procsService.Procs().Get(0)
 	if err != nil {
-		logger.Warningf("[%s] get procs failed, err: %v", "manager",err)
+		logger.Warningf("[%s] get procs failed, err: %v", "manager", err)
 		return nil, err
 	}
 	// map[exec][pid exec cgroups]
@@ -303,41 +303,69 @@ func (m *Manager) GetAllProcs() (map[string]newCGroups.ControlProcSl, error) {
 // start listen
 func (m *Manager) Listen() error {
 	m.procsService.InitSignalExt(m.sigLoop, true)
-	_, err := m.procsService.ConnectExecProc(func(execPath string, cwdPath string, pid string) {
+	_, err := m.procsService.ConnectExecProc(func(execPath string, cgroupPath string, pid string, ppid string) {
+		proc := &netlink.ProcMessage{
+			ExecPath:   execPath,
+			CGroupPath: cgroupPath,
+			Pid:        pid,
+			PPid:       ppid,
+		}
+
+		// check if is child proc
+		controller := m.controllerMgr.GetControllerByCtrlPPid(ppid)
+		if controller != nil {
+			// cover proc
+			parent := controller.CheckCtrlPid(ppid)
+			proc.ExecPath = parent.ExecPath
+			proc.CGroupPath = parent.CGroupPath
+			// add to
+			err := controller.AddCtrlProc(proc)
+			if err != nil {
+				logger.Warningf("[%s] add exec %s to cgroups failed, err: %v", controller.Name, execPath, err)
+			}
+			return
+		}
+
 		// search controller according to exe path, get highest priority one
-		controller := m.controllerMgr.GetControllerByCtlPath(execPath)
+		controller = m.controllerMgr.GetControllerByCtlPath(execPath)
 		if controller == nil {
 			return
 		}
-		proc := &netlink.ProcMessage{
-			ExecPath: execPath,
-			Pid:      pid,
-		}
+		//proc := &netlink.ProcMessage{
+		//	ExecPath:   execPath,
+		//	CGroupPath: cgroupPath,
+		//	Pid:        pid,
+		//	PPid:       ppid,
+		//}
 		// add to cgroups.procs and save
 		err := controller.AddCtrlProc(proc)
 		if err != nil {
 			logger.Warningf("[%s] add exec %s to cgroups failed, err: %v", controller.Name, execPath, err)
 		}
+
 	})
 	if err != nil {
 		logger.Warningf("connect exec proc failed, err: %v")
 		return err
 	}
-	_, err = m.procsService.ConnectExitProc(func(execPath string, cwdPath string, pid string) {
+	_, err = m.procsService.ConnectExitProc(func(execPath string, cgroupPath string, pid string, ppid string) {
 		// search controller according to exe path
 		controller := m.controllerMgr.GetControllerByCtlPath(execPath)
 		if controller == nil {
 			return
 		}
 		proc := &netlink.ProcMessage{
-			ExecPath: execPath,
-			Pid:      pid,
+			ExecPath:   execPath,
+			CGroupPath: cgroupPath,
+			Pid:        pid,
+			PPid:       ppid,
 		}
 		// del from save
 		err := controller.DelCtlProc(proc)
 		if err != nil {
 			logger.Warningf("[%s] del exec %s from cgroups failed, err: %v", controller.Name, execPath, err)
 		}
+
 	})
 	if err != nil {
 		logger.Warningf("connect exit proc failed, err: %v")
@@ -423,6 +451,7 @@ func (m *Manager) firstAdjustCGroups() error {
 			logger.Debugf("[%s] dont need add %s at first", "manager", path)
 			continue
 		}
+
 		// check if already exist
 		controller := m.controllerMgr.GetControllerByCtlPath(path)
 		if controller == nil {

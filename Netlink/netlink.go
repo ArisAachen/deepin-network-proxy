@@ -24,6 +24,7 @@ type ProcMessage struct {
 	ExecPath    string // exe path
 	Cgroup2Path string // mark cgroup v2 path
 	Pid         string // Pid
+	PPid        string // ppid
 }
 
 // Manager all procs

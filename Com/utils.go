@@ -11,7 +11,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -27,8 +26,10 @@ import (
 const (
 	SoOriginalDst    = 80
 	Ip6SoOriginalDst = 80 // from linux/include/uapi/linux/netfilter_ipv6/ip6_tables.h
-	ConfigPath       = ".config/deepin-proxy"
+	deepinPath       = "/etc/deepin"
+	ConfigPath       = "deepin-proxy"
 	cgroupPrefix     = "/sys/fs/cgroup/unified"
+	cgroupSuffix     = "cgroup.procs"
 )
 
 // get origin destination addr
@@ -322,13 +323,13 @@ func UnMarshalPackage(msg []byte) DataPackage {
 // get home dir
 func GetUserConfigDir() (string, error) {
 	// get current user
-	curUser, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-	// get home dir
-	home := curUser.HomeDir
-	return filepath.Join(home, ConfigPath), nil
+	//curUser, err := user.Current()
+	//if err != nil {
+	//	return "", err
+	//}
+	//// get home dir
+	//home := curUser.HomeDir
+	return filepath.Join(deepinPath, ConfigPath), nil
 }
 
 // make sure dir exist
@@ -500,7 +501,7 @@ func MegaDel(src interface{}, tgt interface{}) (interface{}, bool, error) {
 		front := values.Slice(0, index)
 		// check special pos, if is the last elem
 		if index == values.Len()-1 {
-			return front, true, nil
+			return front.Interface(), true, nil
 		}
 		// if not the last elem, including the first one
 		back := values.Slice(index+1, values.Len())
@@ -561,8 +562,33 @@ func ParseCGroup2FromBuf(in []byte) string {
 		// https://www.kernel.org/doc/Documentation/cgroup-v2.txt
 		if bytes.HasPrefix(buf, []byte("0::")) {
 			backPath := bytes.TrimPrefix(buf, []byte("0::"))
-			fullPath := filepath.Join(cgroupPrefix, string(backPath))
+			fullPath := filepath.Join(cgroupPrefix, string(backPath), cgroupSuffix)
 			return fullPath
+		}
+	}
+}
+
+// parse
+func ParsePPidFromBuf(in []byte) string {
+	byt := bytes.NewBuffer(in)
+	reader := bufio.NewReader(byt)
+
+	for {
+		// read line
+		buf, _, err := reader.ReadLine()
+		// dont care about if error if EOF
+		if err != nil {
+			return ""
+		}
+		// cgroup v2 message
+		// https://www.kernel.org/doc/Documentation/cgroup-v2.txt
+		ppidMsg := string(buf)
+		if strings.HasPrefix(ppidMsg, "PPid:") {
+			path := strings.Split(ppidMsg, "\t")
+			if len(path) < 2 {
+				return ""
+			}
+			return path[1]
 		}
 	}
 }

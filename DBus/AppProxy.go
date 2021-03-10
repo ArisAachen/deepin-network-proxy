@@ -141,7 +141,7 @@ func (mgr *AppProxy) delProxyApps(apps []string) error {
 			return err
 		}
 		temp, ok := ifc.([]string)
-		if !ok {
+		if !ok && ifc != nil {
 			return nil
 		}
 		mgr.Proxies.ProxyProgram = temp

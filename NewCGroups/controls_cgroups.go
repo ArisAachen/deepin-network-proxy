@@ -30,7 +30,7 @@ func (ctSl *ControlProcSl) Release() error {
 		err := attach(ctrl.Pid, ctrl.CGroupPath)
 		if err != nil {
 			logger.Warningf("[%s] attach %s back to origin cgroups %s failed, err: %v", ctrl.ExecPath, ctrl.Pid, ctrl.CGroupPath, err)
-			return err
+			continue
 		}
 		logger.Debugf("[%s] attach %s back to origin cgroups %s success", ctrl.ExecPath, ctrl.Pid, ctrl.CGroupPath)
 	}
@@ -101,6 +101,16 @@ func (ctSl *ControlProcSl) CheckCtlProcExist(proc *netlink.ProcMessage) bool {
 	return false
 }
 
+// check if new proc`s parent proc exist
+func (ctSl *ControlProcSl) CheckCtrlPidExist(ppid string) *netlink.ProcMessage {
+	for _, ctrl := range *ctSl {
+		if ctrl.Pid == ppid {
+			return ctrl
+		}
+	}
+	return nil
+}
+
 // source controller
 type Controller struct {
 	// controller name
@@ -158,6 +168,17 @@ func (c *Controller) CheckCtlPathSl(path string) bool {
 		}
 	}
 	return false
+}
+
+// check if new proc`s parent proc exist
+func (c *Controller) CheckCtrlPid(ppid string) *netlink.ProcMessage {
+	for _, ctrlSl := range c.CtlProcMap {
+		// check if ppid exist in proc pid
+		if ctrl := ctrlSl.CheckCtrlPidExist(ppid); ctrl != nil {
+			return ctrl
+		}
+	}
+	return nil
 }
 
 // check if current control proc exist

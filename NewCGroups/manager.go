@@ -66,6 +66,19 @@ func (m *Manager) GetControllerByCtlPath(path string) *Controller {
 	return nil
 }
 
+// get controller by control pid
+func (m *Manager) GetControllerByCtrlPPid(ppid string) *Controller {
+	// search ppid
+	for _, controller := range m.controllers {
+		if controller.CheckCtrlPid(ppid) != nil {
+			logger.Debugf("[%s] controller find ppid  %s", controller.Name, ppid)
+			return controller
+		}
+	}
+	logger.Debugf("ppid %s cant found in any controller ", ppid)
+	return nil
+}
+
 // check if name controller already exist
 func (m *Manager) CheckControllerExist(name define.Scope, priority define.Priority) bool {
 	// search name
