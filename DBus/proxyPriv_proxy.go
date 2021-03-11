@@ -8,6 +8,7 @@ import (
 	"net"
 	"pkg.deepin.io/lib/dbusutil"
 	"strconv"
+	"syscall"
 )
 
 // interface path
@@ -27,6 +28,7 @@ func (mgr *proxyPrv) GetProxy() (string, *dbus.Error) {
 
 // start proxy
 func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error {
+	mgr.stop = false
 	logger.Debugf("[%s] start proxy, proto [%s] name [%s] udp [%v]", mgr.scope, proto, name, udp)
 	// check if proto is legal
 	var proxyTyp tProxy.ProtoTyp
@@ -54,6 +56,8 @@ func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error
 	if err != nil {
 		return dbusutil.ToError(err)
 	}
+	// save tcp handler
+	mgr.tcpHandler = listen
 	logger.Debugf("[%s] proxy [%s] listen tcp success at port %v", mgr.scope, proto, mgr.Proxies.TPort)
 	// in case blocks DBus-return, use goroutine
 	go mgr.accept(proxyTyp, proxy, listen)
@@ -82,9 +86,21 @@ func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error
 
 // stop proxy
 func (mgr *proxyPrv) StopProxy() *dbus.Error {
+	mgr.stop = true
 	logger.Debugf("[%s] stop proxy, enable: %v, proxy: %v", mgr.scope, mgr.Enabled, mgr.Proxy)
 	// stop to break accept and read message
-	mgr.stop.Broadcast()
+	if mgr.tcpHandler != nil {
+		err := mgr.tcpHandler.Close()
+		if err != nil {
+			logger.Warningf("[%s] stop proxy tcp handler failed, err: %v", mgr.scope, err)
+		}
+	}
+	if mgr.udpHandler != nil {
+		err := mgr.udpHandler.Close()
+		if err != nil {
+			logger.Warningf("[%s] stop proxy udp handler failed, err: %v", mgr.scope, err)
+		}
+	}
 
 	go func() {
 		_ = mgr.stopRedirect()
@@ -148,12 +164,20 @@ func (mgr *proxyPrv) listen() (net.Listener, error) {
 		logger.Warningf("[%s] tcp listener get file failed, err: %v", err)
 		return nil, err
 	}
+	defer file.Close()
 	// set transparent
 	err = com.SetSockOptTrn(int(file.Fd()))
 	if err != nil {
 		logger.Warningf("[%s] set fd opt transparent failed, err: %v", mgr.scope, err)
 		return nil, err
 	}
+	// set non block
+	err = syscall.SetNonblock(int(file.Fd()), true)
+	if err != nil {
+		logger.Warningf("[%s] set non block failed, err: %v", mgr.scope, err)
+		return nil, err
+	}
+
 	return l, nil
 }
 
@@ -187,26 +211,15 @@ func (mgr *proxyPrv) accept(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, listen
 		return
 	}
 
-	// wait stop
-	var stop bool
-	go func() {
-		mgr.stop.L.Lock()
-		mgr.stop.Wait()
-		mgr.stop.L.Unlock()
-		stop = true
-		// close connection
-		_ = listen.Close()
-		logger.Debugf("[%s] close listen", mgr.scope)
-	}()
-
 	// start accept until stop
 	for {
 		// accept connect
+		// https://github.com/golang/go/issues/10527
 		lConn, err := listen.Accept()
 		if err != nil {
-			if stop {
-				logger.Debugf("[%s] stop proxy, break", mgr.scope)
-				goto END
+			if mgr.stop {
+				logger.Debugf("[%s] stop proxy tcp break", mgr.scope)
+				break
 			}
 			logger.Warningf("[%s] accept socket failed, err: %v", proxyTyp, err)
 			continue
@@ -214,7 +227,6 @@ func (mgr *proxyPrv) accept(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, listen
 		// proxy tcp
 		go mgr.proxyTcp(proxyTyp, proxy, lConn)
 	}
-END:
 	logger.Debugf("[%s] stop proxy, prepare close handler", mgr.scope)
 	mgr.handlerMgr.CloseTypHandler(proxyTyp)
 }
@@ -233,50 +245,36 @@ func (mgr *proxyPrv) readMsgUDP(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, li
 	}
 	defer conn.Close()
 
-	// wait stop
-	ch := make(chan bool)
-	go func() {
-		mgr.stop.L.Lock()
-		mgr.stop.Wait()
-		mgr.stop.L.Unlock()
-		// close connection
-		_ = conn.Close()
-		// break
-		ch <- true
-	}()
-
 	// start accept until stop
 	for {
-		select {
-		case <-ch:
-			// close all scope handler
-			mgr.handlerMgr.CloseTypHandler(proxyTyp)
-			// break accept
-			goto END
-		default:
-			// read origin addr
-			buf := make([]byte, 512)
-			oob := make([]byte, 1024)
-			_, oobNum, _, lAddr, err := conn.ReadMsgUDP(buf, oob)
-			if err != nil {
-				logger.Fatal(err)
+		// read origin addr
+		buf := make([]byte, 512)
+		oob := make([]byte, 1024)
+		_, oobNum, _, lAddr, err := conn.ReadMsgUDP(buf, oob)
+		if err != nil {
+			if mgr.stop {
+				logger.Debugf("[%s] stop proxy udp break", mgr.scope)
+				break
 			}
-			// get real remote addr
-			rBaseAddr, err := com.ParseRemoteAddrFromMsgHdr(oob[:oobNum])
-			if err != nil {
-				logger.Fatal(err)
-			}
-
-			// make remote addr
-			rAddr := &net.UDPAddr{
-				IP:   rBaseAddr.IP,
-				Port: rBaseAddr.Port,
-			}
-			// proxy udp
-			go mgr.proxyUdp(proxy, lAddr, rAddr, buf)
+			logger.Warningf("[%s] read udp msg failed, err: %v", mgr.scope, err)
+			continue
 		}
+		// get real remote addr
+		rBaseAddr, err := com.ParseRemoteAddrFromMsgHdr(oob[:oobNum])
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		// make remote addr
+		rAddr := &net.UDPAddr{
+			IP:   rBaseAddr.IP,
+			Port: rBaseAddr.Port,
+		}
+		// proxy udp
+		go mgr.proxyUdp(proxy, lAddr, rAddr, buf)
 	}
-END:
+	logger.Debugf("[%s] stop proxy, prepare close handler", mgr.scope)
+	mgr.handlerMgr.CloseTypHandler(proxyTyp)
 }
 
 func (mgr *proxyPrv) proxyTcp(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, lConn net.Conn) {

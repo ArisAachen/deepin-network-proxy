@@ -78,7 +78,6 @@ func (m *Manager) Init() error {
 
 	m.sigLoop = dbusutil.NewSignalLoop(sesService.Conn(), 10)
 
-	m.controllerMgr = newCGroups.NewManager()
 	return nil
 }
 
@@ -239,6 +238,7 @@ func (m *Manager) initIptables() error {
 
 // init cgroups
 func (m *Manager) initCGroups() error {
+	m.controllerMgr = newCGroups.NewManager()
 	// create controller
 	var err error
 	m.mainController, err = m.controllerMgr.CreatePriorityController(define.Main, define.MainPriority)

@@ -153,7 +153,7 @@ func (mgr *proxyPrv) releaseRule() error {
 	}
 	err := selfChain.Remove()
 	if err != nil {
-		logger.Warningf("[%s] remove self create chain failed, err: %v", err)
+		logger.Warningf("[%s] remove self create chain failed, err: %v", mgr.scope, err)
 		return err
 	}
 

@@ -99,15 +99,18 @@ func SetSockOptTrn(fd int) error {
 		return errors.New("sock type is not tcp and udp")
 	}
 	// set reuse addr
-	if err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); err != nil {
+	err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
+	if err != nil {
 		return err
 	}
 	// set ip transparent
-	if err = syscall.SetsockoptInt(fd, syscall.SOL_IP, syscall.IP_TRANSPARENT, 1); err != nil {
+	err = syscall.SetsockoptInt(fd, syscall.SOL_IP, syscall.IP_TRANSPARENT, 1)
+	if err != nil {
 		return err
 	}
 	// set ip recv_origin_dst
-	if err = syscall.SetsockoptInt(fd, syscall.SOL_IP, syscall.IP_RECVORIGDSTADDR, 1); err != nil {
+	err = syscall.SetsockoptInt(fd, syscall.SOL_IP, syscall.IP_RECVORIGDSTADDR, 1);
+	if err != nil {
 		return err
 	}
 	return nil
@@ -608,10 +611,42 @@ func RunScript(path string, params []string) ([]byte, error) {
 }
 
 // marshal json
-func MarshalJson(v interface{})(string,error){
-	buf,err := json.Marshal(v)
+func MarshalJson(v interface{}) (string, error) {
+	buf, err := json.Marshal(v)
 	if err != nil {
 		return "", err
 	}
-	return string(buf),nil
+	return string(buf), nil
+}
+
+// fd may block if add to file, set as non block then close
+func CloseBlockListener(listener net.Listener) error {
+	// if is tcp listener
+	if reflect.TypeOf(listener) == reflect.TypeOf(&net.TCPListener{}) {
+		// convert to tcp listener
+		tcpLsn, ok := listener.(*net.TCPListener)
+		if !ok {
+			return nil
+		}
+		// get sys conn
+		sysConn, err := tcpLsn.SyscallConn()
+		if err != nil {
+			return err
+		}
+		// set unblock and close
+		err = sysConn.Control(func(fd uintptr) {
+			err = syscall.SetNonblock(int(fd), true)
+			if err != nil {
+				return
+			}
+		})
+		err = listener.Close()
+		log.Printf(">>> SetNonblock listen addr : %v \n", listener)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	return errors.New("cant match listener type")
 }

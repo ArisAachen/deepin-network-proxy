@@ -8,9 +8,9 @@ import (
 	newCGroups "github.com/DeepinProxy/NewCGroups"
 	newIptables "github.com/DeepinProxy/NewIptables"
 	tProxy "github.com/DeepinProxy/TProxy"
+	"net"
 	"path/filepath"
 	"pkg.deepin.io/lib/log"
-	"sync"
 )
 
 var logger *log.Logger
@@ -41,6 +41,10 @@ type proxyPrv struct {
 	// handler manager
 	manager *Manager
 
+	// listener
+	tcpHandler net.Listener
+	udpHandler net.PacketConn
+
 	// cgroup controller
 	controller *newCGroups.Controller
 
@@ -54,7 +58,7 @@ type proxyPrv struct {
 	handlerMgr *tProxy.HandlerMgr
 
 	// stop chan
-	stop *sync.Cond
+	stop bool
 }
 
 // init proxy private
@@ -63,7 +67,7 @@ func initProxyPrv(scope define.Scope, priority define.Priority) proxyPrv {
 		scope:      scope,
 		priority:   priority,
 		handlerMgr: tProxy.NewHandlerMsg(scope),
-		stop:       sync.NewCond(&sync.Mutex{}),
+		stop:       false,
 		Proxies: config.ScopeProxies{
 			Proxies:      make(map[string][]config.Proxy),
 			ProxyProgram: make([]string, 10),
