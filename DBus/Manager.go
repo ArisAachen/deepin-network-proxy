@@ -65,17 +65,19 @@ func (m *Manager) Init() error {
 	}
 	m.sesService = sesService
 
-	// init system dbus service to monitor service
-	service, err := dbusutil.NewSystemService()
-	if err != nil {
-		logger.Warningf("init dbus system service failed, err:  %v", err)
-		return err
-	}
+	//// init system dbus service to monitor service
+	//service, err := dbusutil.NewSystemService()
+	//if err != nil {
+	//	logger.Warningf("init dbus system service failed, err:  %v", err)
+	//	return err
+	//}
 	// store service
-	m.sysService = service
-	// attach dbus object
-	m.procsService = netlink.NewProcs(service.Conn())
-	m.sigLoop = dbusutil.NewSignalLoop(service.Conn(), 10)
+	m.sysService = sesService
+	// attach dbus objects
+	m.procsService = netlink.NewProcs(sesService.Conn())
+
+	m.sigLoop = dbusutil.NewSignalLoop(sesService.Conn(), 10)
+
 	m.controllerMgr = newCGroups.NewManager()
 	return nil
 }
@@ -302,6 +304,7 @@ func (m *Manager) GetAllProcs() (map[string]newCGroups.ControlProcSl, error) {
 
 // start listen
 func (m *Manager) Listen() error {
+	m.sigLoop.Start()
 	m.procsService.InitSignalExt(m.sigLoop, true)
 	_, err := m.procsService.ConnectExecProc(func(execPath string, cgroupPath string, pid string, ppid string) {
 		proc := &netlink.ProcMessage{
@@ -310,7 +313,7 @@ func (m *Manager) Listen() error {
 			Pid:        pid,
 			PPid:       ppid,
 		}
-
+		logger.Debugf("listen exec proc %v", proc)
 		// check if is child proc
 		controller := m.controllerMgr.GetControllerByCtrlPPid(ppid)
 		if controller != nil {
@@ -350,6 +353,7 @@ func (m *Manager) Listen() error {
 	}
 	_, err = m.procsService.ConnectExitProc(func(execPath string, cgroupPath string, pid string, ppid string) {
 		// search controller according to exe path
+		logger.Debugf("listen exit proc %v", execPath)
 		controller := m.controllerMgr.GetControllerByCtlPath(execPath)
 		if controller == nil {
 			return
@@ -367,11 +371,6 @@ func (m *Manager) Listen() error {
 		}
 
 	})
-	m.sigLoop.Start()
-	if err != nil {
-		logger.Warningf("connect exit proc failed, err: %v")
-		return err
-	}
 	return nil
 }
 

@@ -11,8 +11,8 @@ const (
 )
 
 const (
-	BusServiceName = "com.deepin.system.procs"
-	BusPath        = "/com/deepin/system/procs"
+	BusServiceName = "com.deepin.system.Procs"
+	BusPath        = "/com/deepin/system/Procs"
 	BusInterface   = BusServiceName
 )
 

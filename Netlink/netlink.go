@@ -49,14 +49,16 @@ type ProcManager struct {
 	// signals
 	signals *struct {
 		ExecProc struct {
-			execPath    string // exe path
-			cgroup2Path string // mark cgroup v2 path
-			pid         string // Pid
+			ExecPath   string // exe path
+			CGroupPath string // mark cgroup v2 path
+			Pid        string // Pid
+			PPid       string
 		}
 		ExitProc struct {
-			execPath    string // exe path
-			cgroup2Path string // mark cgroup v2 path
-			pid         string // Pid
+			ExecPath   string // exe path
+			CGroupPath string // mark cgroup v2 path
+			Pid        string // Pid
+			PPid       string
 		}
 	}
 }
@@ -300,7 +302,7 @@ func (p *ProcManager) addProc(pid string, msg ProcMessage) {
 	p.lock.Unlock()
 
 	logger.Debugf("current exec proc %v", msg)
-	err := p.service.Emit(p, "ExecProc", msg.ExecPath, msg.Cgroup2Path, msg.Pid)
+	err := p.service.Emit(p, "ExecProc", msg.ExecPath, msg.Cgroup2Path, msg.Pid,msg.PPid)
 	if err != nil {
 		logger.Warningf("emit %v ExecProc failed, err: %v", msg, err)
 		return
@@ -324,7 +326,7 @@ func (p *ProcManager) delProc(pid string) {
 
 	if ok {
 		logger.Debugf("current exit proc %v", msg)
-		err := p.service.Emit(p, "ExitProc", msg.ExecPath, msg.Cgroup2Path, msg.Pid)
+		err := p.service.Emit(p, "ExitProc", msg.ExecPath, msg.Cgroup2Path, msg.Pid,msg.PPid)
 		if err != nil {
 			logger.Warningf("emit %v ExitProc failed, err: %v", msg, err)
 			return

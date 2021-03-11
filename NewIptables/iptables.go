@@ -179,6 +179,8 @@ func (c *Chain) DelChild(child *Chain) error {
 		// find child
 		if chain == child {
 			childName = name
+			delete(c.children, childName)
+			break
 		}
 	}
 	// check if child name is nil

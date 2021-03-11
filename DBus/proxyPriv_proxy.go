@@ -20,7 +20,7 @@ func (mgr *proxyPrv) GetProxy() (string, *dbus.Error) {
 	buf, err := com.MarshalJson(mgr.Proxy)
 	if err != nil {
 		logger.Warningf("[%s] get proxy failed, err: %v", mgr.scope, err)
-		return "",dbusutil.ToError(err)
+		return "", dbusutil.ToError(err)
 	}
 	return buf, nil
 }
@@ -188,33 +188,35 @@ func (mgr *proxyPrv) accept(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, listen
 	}
 
 	// wait stop
-	ch := make(chan bool)
+	var stop bool
 	go func() {
 		mgr.stop.L.Lock()
 		mgr.stop.Wait()
 		mgr.stop.L.Unlock()
-		ch <- true
+		stop = true
+		// close connection
+		_ = listen.Close()
+		logger.Debugf("[%s] close listen", mgr.scope)
 	}()
 
 	// start accept until stop
 	for {
-		select {
-		case <-ch:
-			// close all scope handler
-			mgr.handlerMgr.CloseTypHandler(proxyTyp)
-			// break accept
-			break
-		default:
-			// accept connect
-			lConn, err := listen.Accept()
-			if err != nil {
-				logger.Warningf("[%s] accept socket failed, err: %v", proxyTyp, err)
-				continue
+		// accept connect
+		lConn, err := listen.Accept()
+		if err != nil {
+			if stop {
+				logger.Debugf("[%s] stop proxy, break", mgr.scope)
+				goto END
 			}
-			// proxy tcp
-			go mgr.proxyTcp(proxyTyp, proxy, lConn)
+			logger.Warningf("[%s] accept socket failed, err: %v", proxyTyp, err)
+			continue
 		}
+		// proxy tcp
+		go mgr.proxyTcp(proxyTyp, proxy, lConn)
 	}
+END:
+	logger.Debugf("[%s] stop proxy, prepare close handler", mgr.scope)
+	mgr.handlerMgr.CloseTypHandler(proxyTyp)
 }
 
 // read udp message
@@ -229,6 +231,7 @@ func (mgr *proxyPrv) readMsgUDP(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, li
 		logger.Warning("convert udp data failed")
 		return
 	}
+	defer conn.Close()
 
 	// wait stop
 	ch := make(chan bool)
@@ -236,6 +239,9 @@ func (mgr *proxyPrv) readMsgUDP(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, li
 		mgr.stop.L.Lock()
 		mgr.stop.Wait()
 		mgr.stop.L.Unlock()
+		// close connection
+		_ = conn.Close()
+		// break
 		ch <- true
 	}()
 
@@ -246,7 +252,7 @@ func (mgr *proxyPrv) readMsgUDP(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, li
 			// close all scope handler
 			mgr.handlerMgr.CloseTypHandler(proxyTyp)
 			// break accept
-			break
+			goto END
 		default:
 			// read origin addr
 			buf := make([]byte, 512)
@@ -270,6 +276,7 @@ func (mgr *proxyPrv) readMsgUDP(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, li
 			go mgr.proxyUdp(proxy, lAddr, rAddr, buf)
 		}
 	}
+END:
 }
 
 func (mgr *proxyPrv) proxyTcp(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, lConn net.Conn) {
