@@ -3,6 +3,7 @@ package DBus
 import (
 	"errors"
 	com "github.com/DeepinProxy/Com"
+	"github.com/dde-daemon/session/common"
 	"os"
 	"path/filepath"
 	"sync"
@@ -75,6 +76,11 @@ func (m *Manager) Init() error {
 	m.sysService = sesService
 	// attach dbus objects
 	m.procsService = netlink.NewProcs(sesService.Conn())
+	// start service
+	err = common.ActivateSysDaemonService(m.procsService.ServiceName_())
+	if err != nil {
+		logger.Warningf("[Manager] activate proc service failed, err: %v", err)
+	}
 
 	m.sigLoop = dbusutil.NewSignalLoop(sesService.Conn(), 10)
 

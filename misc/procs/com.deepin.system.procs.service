@@ -1,4 +1,4 @@
 [D-BUS Service]
-Name=com.deepin.system.procs
+Name=com.deepin.system.Procs
 Exec=/usr/lib/deepin-daemon/netlink
 User=root
