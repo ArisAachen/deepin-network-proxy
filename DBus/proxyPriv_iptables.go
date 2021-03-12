@@ -163,8 +163,21 @@ func (mgr *proxyPrv) releaseRule() error {
 		logger.Warningf("[%s] default chain is nil", mgr.scope)
 		return fmt.Errorf("[%s] default chain is nil", mgr.scope)
 	}
-	// iptables -t mangle -D PREROUTING -j TPROXY -m mark --mark $2
-	extends := newIptables.ExtendsRule{
+	// iptables -t mangle -A PREROUTING -j TPROXY -m mark --mark $2 --on-port 8080
+	protoExtends := newIptables.ExtendsRule{
+		// -m
+		Match: "p",
+		// mark --mark $2
+		Elem: newIptables.ExtendsElem{
+			// mark
+			Match: "tcp",
+			// --mark $2
+			Base: newIptables.BaseRule{
+				Match: "on-port", Param: strconv.Itoa(mgr.Proxies.TPort),
+			},
+		},
+	}
+	markExtends := newIptables.ExtendsRule{
 		// -m
 		Match: "m",
 		// mark --mark $2
@@ -183,7 +196,7 @@ func (mgr *proxyPrv) releaseRule() error {
 		Action: newIptables.TPROXY,
 		BaseSl: nil,
 		// -m mark --mark $2
-		ExtendsSl: []newIptables.ExtendsRule{extends},
+		ExtendsSl: []newIptables.ExtendsRule{protoExtends, markExtends},
 	}
 	err = defChain.DelRule(cpl)
 	if err != nil {
