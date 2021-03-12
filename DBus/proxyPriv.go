@@ -67,7 +67,7 @@ func initProxyPrv(scope define.Scope, priority define.Priority) proxyPrv {
 		scope:      scope,
 		priority:   priority,
 		handlerMgr: tProxy.NewHandlerMsg(scope),
-		stop:       false,
+		stop:       true,
 		Proxies: config.ScopeProxies{
 			Proxies:      make(map[string][]config.Proxy),
 			ProxyProgram: make([]string, 10),

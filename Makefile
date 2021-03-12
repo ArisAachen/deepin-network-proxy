@@ -27,9 +27,9 @@ install:
 	mkdir -p ${PREFIXETC}/${DEEPIN}/${PROXYFILE}
 	install -v -D -m755 -t ${DESTDIR}${PREFIXETC}/${DEEPIN}/${PROXYFILE} misc/script/clean_script.sh
 	install -v -D -m755 -t ${DESTDIR}${PREFIXETC}/${DEEPIN}/${PROXYFILE} misc/proxy/proxy.yaml
-	install -v -D -m755 -t ${DESTDIR}${PREFIX}/share/dbus-1/system.d misc/procs/com.deepin.system.procs.conf
+	install -v -D -m755 -t ${DESTDIR}${PREFIX}/share/dbus-1/system.d misc/procs/com.deepin.system.Procs.conf
 	install -v -D -m755 -t ${DESTDIR}${PREFIX}/share/dbus-1/system.d misc/proxy/com.deepin.system.proxy.conf
-	install -v -D -m755 -t ${DESTDIR}${PREFIX}/share/dbus-1/system-services misc/procs/com.deepin.system.procs.service
+	install -v -D -m755 -t ${DESTDIR}${PREFIX}/share/dbus-1/system-services misc/procs/com.deepin.system.Procs.service
 	install -v -D -m755 -t ${DESTDIR}${PREFIX}/share/dbus-1/system-services misc/proxy/com.deepin.system.proxy.service
 	install -v -D -m755 -t ${DESTDIR}${PREFIX}/${LIB}/${DAEMON} bin/netlink
 	install -v -D -m755 -t ${DESTDIR}${PREFIX}/${LIB}/${DAEMON} bin/dde-proxy

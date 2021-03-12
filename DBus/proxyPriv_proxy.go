@@ -28,6 +28,11 @@ func (mgr *proxyPrv) GetProxy() (string, *dbus.Error) {
 
 // start proxy
 func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error {
+	// already in proxy
+	if !mgr.stop {
+		logger.Debugf("[%] already in proxy")
+		return nil
+	}
 	mgr.stop = false
 	logger.Debugf("[%s] start proxy, proto [%s] name [%s] udp [%v]", mgr.scope, proto, name, udp)
 	// check if proto is legal
@@ -86,6 +91,10 @@ func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error
 
 // stop proxy
 func (mgr *proxyPrv) StopProxy() *dbus.Error {
+	if mgr.stop {
+		logger.Debugf("[%s] already stop proxy")
+		return nil
+	}
 	mgr.stop = true
 	logger.Debugf("[%s] stop proxy, enable: %v, proxy: %v", mgr.scope, mgr.Enabled, mgr.Proxy)
 	// stop to break accept and read message
@@ -133,8 +142,8 @@ func (mgr *proxyPrv) SetProxies(proxies config.ScopeProxies) *dbus.Error {
 	return nil
 }
 
-func (mgr *proxyPrv) ClearProxies() *dbus.Error {
-	mgr.Proxies = config.ScopeProxies{}
+func (mgr *proxyPrv) ClearProxy() *dbus.Error {
+	mgr.Proxies.Proxies = nil
 	err := mgr.writeConfig()
 	if err != nil {
 		logger.Warningf("[%s] write config failed, err: %v", mgr.scope, err)
@@ -229,6 +238,7 @@ func (mgr *proxyPrv) accept(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, listen
 	}
 	logger.Debugf("[%s] stop proxy, prepare close handler", mgr.scope)
 	mgr.handlerMgr.CloseTypHandler(proxyTyp)
+	mgr.tcpHandler = nil
 }
 
 // read udp message

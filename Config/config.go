@@ -134,10 +134,17 @@ func (p *ScopeProxies) GetProxy(proto string, name string) (Proxy, error) {
 	return Proxy{}, fmt.Errorf("proxy name [%s] not exist in proto [%s]", name, proto)
 }
 
+func (p *ScopeProxies) ClearProxy() {
+	p.Proxies = nil
+}
+
 // set and add proxy
 func (p *ScopeProxies) SetProxy(proto string, name string, proxy Proxy) {
 	if p == nil {
 		return
+	}
+	if p.Proxies == nil {
+		p.Proxies = make(map[string][]Proxy)
 	}
 	// get proxies
 	proxies, ok := p.Proxies[proto]

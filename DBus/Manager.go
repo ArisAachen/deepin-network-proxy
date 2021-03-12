@@ -3,7 +3,6 @@ package DBus
 import (
 	"errors"
 	com "github.com/DeepinProxy/Com"
-	"github.com/dde-daemon/session/common"
 	"os"
 	"path/filepath"
 	"sync"
@@ -59,12 +58,12 @@ func NewManager() *Manager {
 // inti manager
 func (m *Manager) Init() error {
 	// init session dbus service to export service
-	sesService, err := dbusutil.NewSystemService()
+	sysService, err := dbusutil.NewSystemService()
 	if err != nil {
 		logger.Warningf("init dbus session service failed, err:  %v", err)
 		return err
 	}
-	m.sesService = sesService
+	// m.sesService = sesService
 
 	//// init system dbus service to monitor service
 	//service, err := dbusutil.NewSystemService()
@@ -73,16 +72,16 @@ func (m *Manager) Init() error {
 	//	return err
 	//}
 	// store service
-	m.sysService = sesService
+	m.sysService = sysService
 	// attach dbus objects
-	m.procsService = netlink.NewProcs(sesService.Conn())
+	m.procsService = netlink.NewProcs(sysService.Conn())
 	// start service
-	err = common.ActivateSysDaemonService(m.procsService.ServiceName_())
-	if err != nil {
-		logger.Warningf("[Manager] activate proc service failed, err: %v", err)
-	}
+	//err = common.ActivateSysDaemonService(m.procsService.ServiceName_())
+	//if err != nil {
+	//	logger.Warningf("[Manager] activate proc service failed, err: %v", err)
+	//}
 
-	m.sigLoop = dbusutil.NewSignalLoop(sesService.Conn(), 10)
+	m.sigLoop = dbusutil.NewSignalLoop(sysService.Conn(), 10)
 
 	return nil
 }
@@ -132,7 +131,7 @@ func (m *Manager) Export() error {
 	// load config
 	appProxy.loadConfig()
 	// create cgroups controller
-	err := appProxy.export(m.sesService)
+	err := appProxy.export(m.sysService)
 	if err != nil {
 		logger.Warningf("create app proxy controller failed, err: %v", err)
 		return err
@@ -146,7 +145,7 @@ func (m *Manager) Export() error {
 	// load config
 	globalProxy.loadConfig()
 	// create cgroups controller
-	err = globalProxy.export(m.sesService)
+	err = globalProxy.export(m.sysService)
 	if err != nil {
 		logger.Warningf("export app proxy failed, err: %v", err)
 		return err
@@ -154,7 +153,7 @@ func (m *Manager) Export() error {
 	m.handler = append(m.handler, globalProxy)
 
 	// request dbus service
-	err = m.sesService.RequestName(BusServiceName)
+	err = m.sysService.RequestName(BusServiceName)
 	if err != nil {
 		logger.Warningf("request service name failed, err: %v", err)
 		return err
@@ -163,7 +162,7 @@ func (m *Manager) Export() error {
 }
 
 func (m *Manager) Wait() {
-	m.sesService.Wait()
+	m.sysService.Wait()
 }
 
 // only run once method

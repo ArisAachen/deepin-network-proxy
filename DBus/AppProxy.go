@@ -15,12 +15,12 @@ type AppProxy struct {
 
 	// methods
 	methods *struct {
-		ClearProxies func()
-		SetProxies   func() `in:"proxies" out:"err"`
-		StartProxy   func() `in:"proto,name,udp" out:"err"`
-		StopProxy    func()
-		GetProxy     func() `out:"proxy"`
-		AddProxy     func() `in:"proto,name,proxy"`
+		ClearProxy func()
+		SetProxies func() `in:"proxies" out:"err"`
+		StartProxy func() `in:"proto,name,udp" out:"err"`
+		StopProxy  func()
+		GetProxy   func() `out:"proxy"`
+		AddProxy   func() `in:"proto,name,proxy"`
 
 		// diff method
 		AddProxyApps func() `in:"app" out:"err"`

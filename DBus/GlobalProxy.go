@@ -18,7 +18,7 @@ type GlobalProxy struct {
 
 	// methods
 	methods *struct {
-		ClearProxies func()
+		ClearProxy func()
 		SetProxies   func() `in:"proxies" out:"err"`
 		StartProxy   func() `in:"proto,name,udp" out:"err"`
 		StopProxy    func()

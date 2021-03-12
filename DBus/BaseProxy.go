@@ -15,7 +15,7 @@ type BaseProxy interface {
 	StartProxy(proto string, name string, udp bool) *dbus.Error
 	StopProxy() *dbus.Error
 	SetProxies(proxies config.ScopeProxies) *dbus.Error
-	ClearProxies() *dbus.Error
+	ClearProxy() *dbus.Error
 	GetProxy() (string, *dbus.Error)
 	AddProxy(proto string, name string, jsonProxy []byte) *dbus.Error
 
