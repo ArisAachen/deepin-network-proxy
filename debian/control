@@ -1,0 +1,25 @@
+Source: deepin-proxy
+Section: misc
+Priority: optional
+Maintainer: Deepin Packages Builder <packages@deepin.com>
+Build-Depends:
+ debhelper-compat (= 11),
+ dh-golang,
+ golang-any,
+ golang-dlib-dev,
+ golang-github-linuxdeepin-go-dbus-factory-dev,
+ golang-github-stretchr-testify-dev,
+ golang-go | gccgo-5,
+Standards-Version: 4.3.0
+Homepage: http://www.deepin.org
+
+Package: deepin-proxy
+Architecture: any
+Built-Using:
+ ${misc:Built-Using},
+Depends:
+ adduser,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: service for global or app proxy
+ deepin-proxy is used for proxy

@@ -23,7 +23,7 @@ prepare:
 Out/%:  prepare
 	env GOPATH="${CURDIR}/${GOPATH_DIR}:${GOPATH}" ${GOBUILD} -o bin/${@F} ${GOPKG_PREFIX}/Out/${@F}
 
-install:
+install:  build
 	mkdir -p ${PREFIXETC}/${DEEPIN}/${PROXYFILE}
 	install -v -D -m755 -t ${DESTDIR}${PREFIXETC}/${DEEPIN}/${PROXYFILE} misc/script/clean_script.sh
 	install -v -D -m755 -t ${DESTDIR}${PREFIXETC}/${DEEPIN}/${PROXYFILE} misc/proxy/proxy.yaml
