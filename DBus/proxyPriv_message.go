@@ -12,6 +12,6 @@ func (mgr *proxyPrv) getScope() define.Scope {
 }
 
 func (mgr *proxyPrv) getDBusPath() dbus.ObjectPath {
-	path := BusPath + "/" + mgr.scope.ToString()
+	path := BusPath + "/" + mgr.scope.String()
 	return dbus.ObjectPath(path)
 }

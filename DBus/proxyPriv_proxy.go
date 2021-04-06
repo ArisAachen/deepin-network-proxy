@@ -13,7 +13,7 @@ import (
 
 // interface path
 func (mgr *proxyPrv) GetInterfaceName() string {
-	return BusInterface + "." + mgr.scope.ToString()
+	return BusInterface + "." + mgr.scope.String()
 }
 
 // get proxy
@@ -30,7 +30,7 @@ func (mgr *proxyPrv) GetProxy() (string, *dbus.Error) {
 func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error {
 	// already in proxy
 	if !mgr.stop {
-		logger.Debugf("[%] already in proxy")
+		logger.Debugf("[%] already in proxy", mgr.scope)
 		return nil
 	}
 	mgr.stop = false

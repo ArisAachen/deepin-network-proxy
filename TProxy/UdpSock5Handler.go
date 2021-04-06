@@ -83,11 +83,11 @@ func (handler *UdpSock5Handler) Communicate() {
 
 	// remote -> local
 	go func() {
-		logger.Debugf("[%s] begin copy data, remote [%s] -> local [%s]", handler.typ, handler.lAddr.String(), handler.rAddr.String())
+		logger.Debugf("[%s] begin copy data, remote [%s] -> local [%s]", handler.typ, handler.rAddr.String(), handler.lAddr.String())
 		_, err := io.Copy(handler, handler.lConn)
 		if err != nil {
 			logger.Debugf("[%s] stop copy data, remote [%s] -x- local [%s], reason: %v",
-				handler.typ, handler.lAddr.String(), handler.rAddr.String(), err)
+				handler.typ, handler.rAddr.String(), handler.lAddr.String(), err)
 		}
 		handler.Remove()
 	}()

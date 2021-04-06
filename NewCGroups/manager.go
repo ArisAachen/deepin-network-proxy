@@ -67,7 +67,7 @@ func (m *Manager) GetControllerByCtlPath(path string) *Controller {
 }
 
 // get controller by control pid
-func (m *Manager) GetControllerByCtrlPPid(ppid string) *Controller {
+func (m *Manager) GetControllerByCtrlByPPid(ppid string) *Controller {
 	// search ppid
 	for _, controller := range m.controllers {
 		if controller.CheckCtrlPid(ppid) != nil {

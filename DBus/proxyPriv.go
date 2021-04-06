@@ -22,7 +22,7 @@ const (
 )
 
 // must ignore proxy proc
-var mainProxy []string = []string{
+var mainProxy = []string{
 	"/usr/lib/deepin-daemon/dde-proxy",
 	"Qv2ray",
 }
@@ -66,12 +66,12 @@ func initProxyPrv(scope define.Scope, priority define.Priority) proxyPrv {
 	prv := proxyPrv{
 		scope:      scope,
 		priority:   priority,
-		handlerMgr: tProxy.NewHandlerMsg(scope),
+		handlerMgr: tProxy.NewHandlerMgr(scope),
 		stop:       true,
 		Proxies: config.ScopeProxies{
 			Proxies:      make(map[string][]config.Proxy),
-			ProxyProgram: make([]string, 10),
-			WhiteList:    make([]string, 10),
+			ProxyProgram: []string{},
+			WhiteList:    []string{},
 		},
 	}
 	return prv
@@ -137,7 +137,7 @@ func (mgr *proxyPrv) stopRedirect() error {
 		return err
 	}
 
-	err = mgr.createIpRule()
+	err = mgr.releaseIpRule()
 	if err != nil {
 		logger.Warningf("[%s] release ipRule failed, err: %v", mgr.scope, err)
 	}
@@ -153,7 +153,7 @@ func (mgr *proxyPrv) stopRedirect() error {
 	return nil
 }
 
-// load config from user home dir
+// load config
 func (mgr *proxyPrv) loadConfig() {
 	// load proxy from manager
 	mgr.Proxies, _ = mgr.manager.config.GetScopeProxies(mgr.scope)
@@ -179,7 +179,7 @@ func (mgr *proxyPrv) writeConfig() error {
 // first clean
 func (mgr *proxyPrv) firstClean() error {
 	// get config path
-	path, err := com.GetUserConfigDir()
+	path, err := com.GetConfigDir()
 	if err != nil {
 		logger.Warningf("[%s] run first clean failed, config err: %v", mgr.scope, err)
 		return err
@@ -187,9 +187,8 @@ func (mgr *proxyPrv) firstClean() error {
 	// get script file path
 	path = filepath.Join(path, define.ScriptName)
 	// run script
-	buf, err := com.RunScript(path, []string{"clear_" + mgr.scope.ToString()})
+	buf, err := com.RunScript(path, []string{"clear_" + mgr.scope.String()})
 	if err != nil {
-		// dont need to delete always
 		logger.Debugf("[%s] run first clean script failed, out: %s, err: %v", mgr.scope, string(buf), err)
 		return err
 	}

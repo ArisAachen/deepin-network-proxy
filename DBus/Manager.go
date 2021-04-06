@@ -63,33 +63,18 @@ func (m *Manager) Init() error {
 		logger.Warningf("init dbus session service failed, err:  %v", err)
 		return err
 	}
-	// m.sesService = sesService
-
-	//// init system dbus service to monitor service
-	//service, err := dbusutil.NewSystemService()
-	//if err != nil {
-	//	logger.Warningf("init dbus system service failed, err:  %v", err)
-	//	return err
-	//}
 	// store service
 	m.sysService = sysService
 	// attach dbus objects
 	m.procsService = netlink.NewProcs(sysService.Conn())
-	// start service
-	//err = common.ActivateSysDaemonService(m.procsService.ServiceName_())
-	//if err != nil {
-	//	logger.Warningf("[Manager] activate proc service failed, err: %v", err)
-	//}
-
 	m.sigLoop = dbusutil.NewSignalLoop(sysService.Conn(), 10)
-
 	return nil
 }
 
 // load config
 func (m *Manager) LoadConfig() error {
 	// get effective user config dir
-	path, err := com.GetUserConfigDir()
+	path, err := com.GetConfigDir()
 	if err != nil {
 		logger.Warningf("failed to get user home dir, user:%v, err: %v", os.Geteuid(), err)
 		return err
@@ -108,7 +93,7 @@ func (m *Manager) LoadConfig() error {
 // write config
 func (m *Manager) WriteConfig() error {
 	// get config path
-	path, err := com.GetUserConfigDir()
+	path, err := com.GetConfigDir()
 	if err != nil {
 		logger.Warningf("[manager] get user home dir failed, user:%v, err: %v", os.Geteuid(), err)
 		return err
@@ -130,7 +115,7 @@ func (m *Manager) Export() error {
 	appProxy.saveManager(m)
 	// load config
 	appProxy.loadConfig()
-	// create cgroups controller
+	// export
 	err := appProxy.export(m.sysService)
 	if err != nil {
 		logger.Warningf("create app proxy controller failed, err: %v", err)
@@ -144,7 +129,7 @@ func (m *Manager) Export() error {
 	globalProxy.saveManager(m)
 	// load config
 	globalProxy.loadConfig()
-	// create cgroups controller
+	// export
 	err = globalProxy.export(m.sysService)
 	if err != nil {
 		logger.Warningf("export app proxy failed, err: %v", err)
@@ -173,7 +158,7 @@ func (m *Manager) Start() {
 	}
 	m.runOnce.Do(func() {
 		// run first clean script
-		_ = m.firstClear()
+		_ = m.firstClean()
 
 		// init cgroups
 		_ = m.initCGroups()
@@ -203,7 +188,7 @@ func (m *Manager) initIptables() error {
 	// create main chain to manager all children chain
 	// sudo iptables -t mangle -N Main
 	// sudo iptables -t mangle -A OUTPUT -j main
-	m.mainChain, err = outputChain.CreateChild(define.Main.ToString(), 0, &newIptables.CompleteRule{Action: define.Main.ToString()})
+	m.mainChain, err = outputChain.CreateChild(define.Main.String(), 0, &newIptables.CompleteRule{Action: define.Main.String()})
 	if err != nil {
 		logger.Warningf("init iptables failed, err: %v", err)
 		return err
@@ -219,7 +204,7 @@ func (m *Manager) initIptables() error {
 			Match: "cgroup",
 			// --path main.slice
 			Base: newIptables.BaseRule{
-				Match: "path", Param: define.Main.ToString() + ".slice",
+				Match: "path", Param: define.Main.String() + ".slice",
 			},
 		},
 	}
@@ -320,7 +305,7 @@ func (m *Manager) Listen() error {
 		}
 		logger.Debugf("listen exec proc %v", proc)
 		// check if is child proc
-		controller := m.controllerMgr.GetControllerByCtrlPPid(ppid)
+		controller := m.controllerMgr.GetControllerByCtrlByPPid(ppid)
 		if controller != nil {
 			// cover proc
 			parent := controller.CheckCtrlPid(ppid)
@@ -339,12 +324,6 @@ func (m *Manager) Listen() error {
 		if controller == nil {
 			return
 		}
-		//proc := &netlink.ProcMessage{
-		//	ExecPath:   execPath,
-		//	CGroupPath: cgroupPath,
-		//	Pid:        pid,
-		//	PPid:       ppid,
-		//}
 		// add to cgroups.procs and save
 		err := controller.AddCtrlProc(proc)
 		if err != nil {
@@ -420,9 +399,9 @@ func (m *Manager) release() error {
 }
 
 // run first clean script
-func (m *Manager) firstClear() error {
+func (m *Manager) firstClean() error {
 	// get config path
-	path, err := com.GetUserConfigDir()
+	path, err := com.GetConfigDir()
 	if err != nil {
 		logger.Warningf("[%s] run first clean failed, config err: %v", "manager", err)
 		return err
@@ -432,7 +411,6 @@ func (m *Manager) firstClear() error {
 	// run script
 	buf, err := com.RunScript(path, []string{"clear_Main"})
 	if err != nil {
-		// dont need to delete always
 		logger.Debugf("[%s] run first clean script failed, out: %s, err: %v", "manager", string(buf), err)
 		return err
 	}

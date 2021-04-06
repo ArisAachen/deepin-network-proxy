@@ -35,8 +35,8 @@ func (handler *Sock4Handler) Tunnel() error {
 	// check type
 	tcpAddr, ok := handler.rAddr.(*net.TCPAddr)
 	if !ok {
-		logger.Warning("[sock4] tunnel addr type is not udp")
-		return errors.New("type is not udp")
+		logger.Warning("[sock4] tunnel addr type is not tcp")
+		return errors.New("type is not tcp")
 	}
 	// sock4 dont support password auth
 	auth := auth{

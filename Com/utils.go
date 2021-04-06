@@ -84,6 +84,7 @@ func SetConnOptTrn(conn net.Conn) error {
 	if !ok {
 		return errors.New("convert file failed")
 	}
+	defer file.Close()
 	// set sock opt trn
 	return SetSockOptTrn(int(file.Fd()))
 }
@@ -109,7 +110,7 @@ func SetSockOptTrn(fd int) error {
 		return err
 	}
 	// set ip recv_origin_dst
-	err = syscall.SetsockoptInt(fd, syscall.SOL_IP, syscall.IP_RECVORIGDSTADDR, 1);
+	err = syscall.SetsockoptInt(fd, syscall.SOL_IP, syscall.IP_RECVORIGDSTADDR, 1)
 	if err != nil {
 		return err
 	}
@@ -208,7 +209,14 @@ func MegaDial(network string, lAddr net.Addr, rAddr net.Addr) (net.Conn, error) 
 		return nil, err
 	}
 	// create new file
-	file := os.NewFile(uintptr(fd), fmt.Sprintf("udp_handler_%v", fd))
+	var name string
+	if network == "tcp" {
+		name = "tcp_handler_%v"
+	} else if network == "udp" {
+		name = "udp_handler_%v"
+	}
+
+	file := os.NewFile(uintptr(fd), fmt.Sprintf(name, fd))
 	if file == nil {
 		return nil, errors.New("create new file is nil")
 	}
@@ -217,7 +225,6 @@ func MegaDial(network string, lAddr net.Addr, rAddr net.Addr) (net.Conn, error) 
 	if err != nil {
 		return nil, err
 	}
-	// debug message
 	return conn, nil
 }
 
@@ -325,7 +332,7 @@ func UnMarshalPackage(msg []byte) DataPackage {
 }
 
 // get home dir
-func GetUserConfigDir() (string, error) {
+func GetConfigDir() (string, error) {
 	// get current user
 	//curUser, err := user.Current()
 	//if err != nil {

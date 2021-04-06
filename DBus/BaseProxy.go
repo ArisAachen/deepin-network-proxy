@@ -50,7 +50,7 @@ func newProxy(scope define.Scope) BaseProxy {
 	case define.Global:
 		return NewGlobalProxy()
 	default:
-		logger.Warningf("init unknown scope type")
+		logger.Warning("init unknown scope type")
 		return nil
 	}
 }

@@ -50,47 +50,6 @@ func (ctSl *ControlProcSl) Attach(path string) error {
 	return nil
 }
 
-//// delete current control proc
-//func (c *Controller) DelCtlProc(proc *netlink.ProcMessage, move bool) error {
-//	// check if exist
-//	if !c.CheckCtlProcExist(proc) {
-//		return nil
-//	}
-//	// not move to other cgroup, should attach to origin cgroup
-//	if !move {
-//		// attach pid to origin cgroup
-//		err := attach(proc.Pid, proc.CGroupPath)
-//		if err != nil {
-//			return err
-//		}
-//	}
-//	procSl := c.CtlProcMap[proc.ExecPath]
-//	// delete proc from self
-//	ifc, update, err := com.MegaDel(procSl, proc)
-//	if err != nil || update {
-//		return nil
-//	}
-//	temp, ok := ifc.(ControlProcSl)
-//	if !ok {
-//		return nil
-//	}
-//	c.CtlProcMap[proc.ExecPath] = temp
-//	return nil
-//}
-
-// del ctrl proc
-//func (ctSl *ControlProcSl) DelCtrlProc(proc *netlink.ProcMessage) {
-//	// check if exist
-//	if !ctSl.CheckCtlProcExist(proc) {
-//		return
-//	}
-//	// delete proc from self
-//	_, update, err := com.MegaDel(*ctSl, proc)
-//	if err != nil || update {
-//		return
-//	}
-//}
-
 // check if proc already exist
 func (ctSl *ControlProcSl) CheckCtlProcExist(proc *netlink.ProcMessage) bool {
 	for _, ctrl := range *ctSl {
@@ -379,12 +338,12 @@ func (c *Controller) MoveOut(path string) ControlProcSl {
 	// check is exist control procs
 	ctSl, ok := c.CtlProcMap[path]
 	if !ok {
-		logger.Debugf("[%s] has not control app path %s", c.Name, path)
+		logger.Debugf("[%s] has not control app path %s, dont need move out", c.Name, path)
 		return nil
 	}
 	// delete from self
 	delete(c.CtlProcMap, path)
-	logger.Debugf("[%s] has not control app path %s", c.Name, path)
+	logger.Debugf("[%s] has control app path %s, need move out", c.Name, path)
 	return ctSl
 }
 
@@ -420,5 +379,5 @@ func (c *Controller) GetCGroupPath() string {
 
 // App.slice
 func (c *Controller) GetName() string {
-	return c.Name.ToString() + suffix
+	return c.Name.String() + suffix
 }

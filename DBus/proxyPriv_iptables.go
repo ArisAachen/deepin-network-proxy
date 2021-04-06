@@ -25,7 +25,7 @@ func (mgr *proxyPrv) createTable() error {
 	index := mgr.manager.mainChain.GetRulesCount()
 	// correct index when is app proxy
 	if mgr.scope == define.App {
-		pos, exist := mgr.manager.mainChain.GetCreateChildIndex(define.Global.ToString())
+		pos, exist := mgr.manager.mainChain.GetCreateChildIndex(define.Global.String())
 		if exist {
 			index = pos
 		}
@@ -39,7 +39,7 @@ func (mgr *proxyPrv) createTable() error {
 	// iptables -t mangle -I main $1 -p tcp -m cgroup --path app.slice/global.slice -j app/global
 	cpl := &newIptables.CompleteRule{
 		// -j app/global
-		Action: mgr.scope.ToString(),
+		Action: mgr.scope.String(),
 		// base rules slice         -p tcp
 		BaseSl: []newIptables.BaseRule{
 			{
@@ -53,13 +53,13 @@ func (mgr *proxyPrv) createTable() error {
 				Match: "m",
 				Elem: newIptables.ExtendsElem{
 					Match: "cgroup",
-					Base:  newIptables.BaseRule{Mark: mark, Match: "path", Param: mgr.controller.GetName()},
+					Base:  newIptables.BaseRule{Not: mark, Match: "path", Param: mgr.controller.GetName()},
 				},
 			},
 		},
 	}
 	// child chain
-	childChain, err := mgr.manager.mainChain.CreateChild(mgr.scope.ToString(), index, cpl)
+	childChain, err := mgr.manager.mainChain.CreateChild(mgr.scope.String(), index, cpl)
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func (mgr *proxyPrv) releaseRule() error {
 		logger.Warningf("[%s] default chain is nil", mgr.scope)
 		return fmt.Errorf("[%s] default chain is nil", mgr.scope)
 	}
-	// iptables -t mangle -A PREROUTING -j TPROXY -m mark --mark $2 --on-port 8080
+	// iptables -t mangle -D PREROUTING -j TPROXY -m mark --mark $2 --on-port 8080
 	protoExtends := newIptables.ExtendsRule{
 		// -m
 		Match: "p",

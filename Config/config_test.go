@@ -93,7 +93,7 @@ func TestProxyConfig_LoadPxyCfg(t *testing.T) {
 		},
 	}
 
-	path, err := Com.GetUserConfigDir()
+	path, err := Com.GetConfigDir()
 	if err != nil {
 		return
 	}

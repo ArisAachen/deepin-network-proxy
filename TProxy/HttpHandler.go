@@ -39,8 +39,8 @@ func (handler *HttpHandler) Tunnel() error {
 	// check type
 	tcpAddr, ok := handler.rAddr.(*net.TCPAddr)
 	if !ok {
-		logger.Warning("[http] tunnel addr type is not udp")
-		return errors.New("type is not udp")
+		logger.Warning("[http] tunnel addr type is not tcp")
+		return errors.New("type is not tcp")
 	}
 	// auth
 	auth := auth{
@@ -55,7 +55,6 @@ func (handler *HttpHandler) Tunnel() error {
 			Host: tcpAddr.String(),
 		},
 		Header: http.Header{
-			//"dde-proxy-Connection": []string{"Keep-Alive"},
 		},
 	}
 	// check if need auth

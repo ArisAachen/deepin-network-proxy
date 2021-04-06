@@ -23,48 +23,13 @@ type BaseHandler interface {
 	Remove() // remove self from map
 	AddMgr(mgr *HandlerMgr)
 
-	// write adn read
+	// write and read
 	WriteRemote([]byte) error
 	WriteLocal([]byte) error
 	ReadRemote([]byte) error
 	ReadLocal([]byte) error
 	Communicate()
 }
-
-//type ProxyScope string
-//
-//const (
-//	NoneProxy   ProxyScope = "no-proxy"
-//	GlobalProxy ProxyScope = "global"
-//	AppProxy    ProxyScope = "app"
-//)
-//
-//func BuildScope(scope string) (ProxyScope, error) {
-//	switch scope {
-//	case "no-proxy":
-//		return NoneProxy, nil
-//	case "global":
-//		return GlobalProxy, nil
-//	case "app":
-//		return AppProxy, nil
-//	default:
-//		return NoneProxy, fmt.Errorf("scope is invalid, scope: %v", scope)
-//	}
-//}
-//
-//// scope
-//func (Scope ProxyScope) String() string {
-//	switch Scope {
-//	case NoneProxy:
-//		return "no-proxy"
-//	case GlobalProxy:
-//		return "global"
-//	case AppProxy:
-//		return "app"
-//	default:
-//		return "unknown-proxy"
-//	}
-//}
 
 // proto
 type ProtoTyp string
@@ -141,7 +106,7 @@ type HandlerMgr struct {
 	stop chan bool
 }
 
-func NewHandlerMsg(scope define.Scope) *HandlerMgr {
+func NewHandlerMgr(scope define.Scope) *HandlerMgr {
 	return &HandlerMgr{
 		scope:      scope,
 		handlerMap: make(map[ProtoTyp]map[HandlerKey]BaseHandler),
@@ -165,8 +130,6 @@ func (mgr *HandlerMgr) AddHandler(typ ProtoTyp, key HandlerKey, base BaseHandler
 		// if exist already, should ignore
 		logger.Debugf("[%s] key has already in map, type: %v, key: %v", mgr.scope, typ, key)
 		return
-		//preBase.Close()
-		//delete(baseMap, key)
 	}
 	// add handler
 	baseMap[key] = base
@@ -211,8 +174,6 @@ func (mgr *HandlerMgr) CloseTypHandler(typ ProtoTyp) {
 
 // close all handler
 func (mgr *HandlerMgr) CloseAll() {
-	mgr.handlerLock.Lock()
-	defer mgr.handlerLock.Unlock()
 	for proto, _ := range mgr.handlerMap {
 		mgr.CloseTypHandler(proto)
 	}

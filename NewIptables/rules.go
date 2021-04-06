@@ -49,7 +49,7 @@ const (
 
 // base rule
 type BaseRule struct {
-	Mark  bool   // !
+	Not   bool   // !
 	Match string // -s
 	Param string // 1111.2222.3333.4444
 }
@@ -58,7 +58,7 @@ type BaseRule struct {
 func (bs *BaseRule) String() string {
 	var sl []string
 	// if mark as false
-	if bs.Mark {
+	if bs.Not {
 		sl = append(sl, "!")
 	}
 	sl = append(sl, "-"+bs.Match, bs.Param)
@@ -74,7 +74,7 @@ type ExtendsElem struct {
 // make string    mark --mark 1
 func (elem *ExtendsElem) String() string {
 	sl := []string{elem.Match}
-	if elem.Base.Mark {
+	if elem.Base.Not {
 		sl = append(sl, "!")
 	}
 	sl = append(sl, "--"+elem.Base.Match, elem.Base.Param)

@@ -284,9 +284,6 @@ func (p *ProcManager) listen() error {
 				logger.Warningf("comm event err: %v", err)
 				continue
 			}
-			if event.ProcessPid == 17472 {
-				logger.Debugf("comm vent pid %v, message: %s", event.ProcessPid, string(buf))
-			}
 		default:
 			logger.Debugf("recv message is proc: %v", header.What)
 			continue

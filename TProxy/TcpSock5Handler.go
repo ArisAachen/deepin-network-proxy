@@ -36,7 +36,7 @@ func (handler *TcpSock5Handler) Tunnel() error {
 	tcpAddr, ok := handler.rAddr.(*net.TCPAddr)
 	if !ok {
 		logger.Warningf("[%s] tunnel addr type is not tcp", handler.typ)
-		return errors.New("type is not udp")
+		return errors.New("type is not tcp")
 	}
 	// auth message
 	auth := auth{

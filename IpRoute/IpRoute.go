@@ -12,7 +12,7 @@ const (
 	del
 )
 
-func (a action) ToString() string {
+func (a action) String() string {
 	switch a {
 	case add:
 		return "add"
@@ -88,7 +88,7 @@ type Route struct {
 // do action
 func (r *Route) action(action action) ([]byte, error) {
 	// do action
-	args := []string{"ip route", action.ToString(), r.Node.String(), r.Info.String()}
+	args := []string{"ip route", action.String(), r.Node.String(), r.Info.String()}
 	// if table is not default
 	if r.table != "" {
 		args = append(args, "table", r.table)
@@ -123,11 +123,11 @@ func (r *Route) Remove() error {
 	logger.Debugf("[%s] remove all rule success", r.table)
 	buf, err := r.action(del)
 	if err != nil {
-		logger.Warningf("[%s] create route failed, out: %s, err: %v", r.table, string(buf), err)
+		logger.Warningf("[%s] remove route failed, out: %s, err: %v", r.table, string(buf), err)
 		return err
 	}
 	// create route success
-	logger.Debugf("[%s] create route success", r.table)
+	logger.Debugf("[%s] remove route success", r.table)
 	return nil
 }
 
@@ -218,7 +218,7 @@ type Rule struct {
 
 // action
 func (rule *Rule) action(action action) ([]byte, error) {
-	args := []string{"ip rule", action.ToString(), rule.ruleSelector.String(), rule.ruleAction.String()}
+	args := []string{"ip rule", action.String(), rule.ruleSelector.String(), rule.ruleAction.String()}
 	if rule.route != nil {
 		args = append(args, "table", rule.route.table)
 	}

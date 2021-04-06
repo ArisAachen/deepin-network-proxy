@@ -161,7 +161,7 @@ func (pr *handlerPrv) Communicate() {
 		logger.Debugf("[%s] begin copy data, remote [%s] -> local [%s]", pr.typ, pr.rAddr.String(), pr.lAddr.String())
 		_, err := io.Copy(pr.rConn, pr.lConn)
 		if err != nil {
-			logger.Debugf("[%s] stop copy data, local [%s] -x- remote [%s], reason: %v", pr.typ, pr.rAddr.String(), pr.lAddr.String(), err)
+			logger.Debugf("[%s] stop copy data, remote [%s] -x- local [%s], reason: %v", pr.typ, pr.rAddr.String(), pr.lAddr.String(), err)
 		}
 		// mark deleted, but not actually deleted at this time, only set a mark
 		if pr.isDeleted() {

@@ -93,7 +93,7 @@ func (c *Chain) CreateChild(name string, index int, cpl *CompleteRule) (*Chain, 
 	}
 	logger.Debugf("[%s] create chain %s success", c.table.Name, name)
 	// start to attach
-	err = c.InsertRule(Insert, index, cpl)
+	err = c.InsertRule(index, cpl)
 	if err != nil {
 		logger.Warningf("[%s] chain %s attach child %s failed, err: %v", c.table.Name, c.Name, name, err)
 		return nil, err
@@ -162,7 +162,7 @@ func (c *Chain) Clear() error {
 	// clear self chain
 	err := c.table.runCommand(Flush, c, 0, nil)
 	if err != nil {
-		logger.Warningf("[%s] chain %s flush failed", c.table.Name, c.Name, err)
+		logger.Warningf("[%s] chain %s flush failed, err: %v", c.table.Name, c.Name, err)
 		return err
 	}
 	// reset all rule
@@ -183,21 +183,21 @@ func (c *Chain) DelChild(child *Chain) error {
 			break
 		}
 	}
-	// check if child name is nil
+	// check if child name is empty
 	if childName == "" {
 		logger.Warningf("[%s] chain %s has not child %s", c.table.Name, c.Name, child.Name)
 		return nil
 	}
 	logger.Debugf("[%s] chain %s has child %s, begin to delete", c.table.Name, c.Name, child.Name)
 	if index, exist := c.GetCreateChildIndex(child.Name); exist {
-		return c.DelIndexRule(index)
+		return c.DelRuleByIndex(index)
 	}
 	return nil
 }
 
 // add rule
 func (c *Chain) AddRule(cpl *CompleteRule) error {
-	return c.InsertRule(Insert, 0, cpl)
+	return c.InsertRule(0, cpl)
 }
 
 // append rule at last
@@ -209,7 +209,7 @@ func (c *Chain) AppendRule(cpl *CompleteRule) error {
 	// clear self chain
 	err := c.table.runCommand(Append, c, 0, cpl)
 	if err != nil {
-		logger.Warningf("[%s] chain %s flush failed, err: %v", c.table.Name, c.Name, err)
+		logger.Warningf("[%s] chain %s append failed, err: %v", c.table.Name, c.Name, err)
 		return err
 	}
 	c.cplRuleSl = append(c.cplRuleSl, cpl)
@@ -217,7 +217,7 @@ func (c *Chain) AppendRule(cpl *CompleteRule) error {
 }
 
 // insert rule
-func (c *Chain) InsertRule(operation Operation, index int, cpl *CompleteRule) error {
+func (c *Chain) InsertRule(index int, cpl *CompleteRule) error {
 	if !c.indexValid(index) {
 		logger.Warningf("[%s] chain %s add rule failed, index invalid", c.table.Name, c.Name)
 		return errors.New("index invalid")
@@ -227,9 +227,9 @@ func (c *Chain) InsertRule(operation Operation, index int, cpl *CompleteRule) er
 		return nil
 	}
 	// clear self chain
-	err := c.table.runCommand(operation, c, index+1, cpl)
+	err := c.table.runCommand(Insert, c, index+1, cpl)
 	if err != nil {
-		logger.Warningf("[%s] chain %s flush failed", c.table.Name, c.Name, err)
+		logger.Warningf("[%s] chain %s insert failed", c.table.Name, c.Name, err)
 		return err
 	}
 	logger.Debugf("[%s] chain %s insert success", c.table.Name, c.Name)
@@ -291,7 +291,7 @@ func (c *Chain) DelRule(cpl *CompleteRule) error {
 }
 
 // get rule index
-func (c *Chain) GetIndexRule(index int) *CompleteRule {
+func (c *Chain) GetRuleByIndex(index int) *CompleteRule {
 	if index >= len(c.cplRuleSl) {
 		return nil
 	}
@@ -299,8 +299,8 @@ func (c *Chain) GetIndexRule(index int) *CompleteRule {
 }
 
 // del rule index
-func (c *Chain) DelIndexRule(index int) error {
-	rule := c.GetIndexRule(index)
+func (c *Chain) DelRuleByIndex(index int) error {
+	rule := c.GetRuleByIndex(index)
 	if rule == nil {
 		return errors.New("index invalid")
 	}

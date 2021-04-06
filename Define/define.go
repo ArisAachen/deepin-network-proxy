@@ -15,7 +15,7 @@ const (
 	Global Scope = "Global"
 )
 
-func (s Scope) ToString() string {
+func (s Scope) String() string {
 	switch s {
 	case Main:
 		return "Main"

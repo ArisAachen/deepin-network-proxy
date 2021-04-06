@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	"github.com/DeepinProxy/Com"
@@ -149,7 +148,7 @@ func (p *ScopeProxies) SetProxy(proto string, name string, proxy Proxy) {
 	// get proxies
 	proxies, ok := p.Proxies[proto]
 	if !ok {
-		proxies = make([]Proxy, 10)
+		proxies = []Proxy{}
 		proxies = append(proxies, proxy)
 		p.Proxies[proto] = proxies
 		return
@@ -199,7 +198,7 @@ func (p *ProxyConfig) WritePxyCfg(path string) error {
 		return err
 	}
 	// in case delete by other user
-	err = ioutil.WriteFile(path, buf, os.ModePerm)
+	err = ioutil.WriteFile(path, buf, 0644)
 	if err != nil {
 		return err
 	}
@@ -212,10 +211,6 @@ func (p *ProxyConfig) LoadPxyCfg(path string) error {
 	if err != nil {
 		return fmt.Errorf("absoute file path failed, err: %v", err)
 	}
-	// read file
-	if _, err = os.Stat(path); os.IsNotExist(err) {
-		return errors.New("config file not exist")
-	}
 	buf, err := ioutil.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read config file failed, err: %v", err)
@@ -225,7 +220,6 @@ func (p *ProxyConfig) LoadPxyCfg(path string) error {
 	if err != nil {
 		return fmt.Errorf("unmarshal config file failed, err: %v", err)
 	}
-	// (host)
 	return nil
 }
 
@@ -235,7 +229,7 @@ func (p *ProxyConfig) GetScopeProxies(scope define.Scope) (ScopeProxies, error) 
 	if p.AllProxies == nil {
 		return ScopeProxies{}, errors.New("all proxy config is nil")
 	}
-	proxies, ok := p.AllProxies[scope.ToString()]
+	proxies, ok := p.AllProxies[scope.String()]
 	if !ok {
 		return ScopeProxies{}, fmt.Errorf("proxy scope [%s] cant found any proxy in all proxies map", scope)
 	}
@@ -248,7 +242,7 @@ func (p *ProxyConfig) SetScopeProxies(scope define.Scope, proxies ScopeProxies) 
 		return
 	}
 	// set proxies
-	p.AllProxies[scope.ToString()] = proxies
+	p.AllProxies[scope.String()] = proxies
 }
 
 // get proxy from config map, index: [global,app] -> [http,sock4,sock5] -> [proxy-name]
@@ -256,7 +250,7 @@ func (p *ProxyConfig) GetProxy(scope string, proto string, name string) (Proxy, 
 	// get global or app proxies from all proxies
 	scopeProxy, ok := p.AllProxies[scope]
 	if !ok {
-		return Proxy{}, fmt.Errorf("proxy type [%s] cant found any proxy in all proxies map", scope)
+		return Proxy{}, fmt.Errorf("proxy scope [%s] cant found any proxy in all proxies map", scope)
 	}
 	// get http sock4 sock5 proxies from type proxies
 	proxy, err := scopeProxy.GetProxy(proto, name)
