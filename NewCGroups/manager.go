@@ -98,5 +98,5 @@ func (m *Manager) GetControllerCount() int {
 // init
 func init() {
 	logger = log.NewLogger("daemon/cgroup")
-	logger.SetLogLevel(log.LevelDebug)
+	logger.SetLogLevel(log.LevelInfo)
 }

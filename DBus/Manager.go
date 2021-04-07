@@ -324,6 +324,7 @@ func (m *Manager) Listen() error {
 		if controller == nil {
 			return
 		}
+		logger.Infof("start proc %s need add to proxy", execPath)
 		// add to cgroups.procs and save
 		err := controller.AddCtrlProc(proc)
 		if err != nil {
@@ -348,6 +349,7 @@ func (m *Manager) Listen() error {
 			Pid:        pid,
 			PPid:       ppid,
 		}
+		logger.Infof("start proc %s need remove from proxy", execPath)
 		// del from save
 		err := controller.DelCtlProc(proc)
 		if err != nil {

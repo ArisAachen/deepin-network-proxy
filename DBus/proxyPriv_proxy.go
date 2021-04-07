@@ -295,7 +295,7 @@ func (mgr *proxyPrv) proxyTcp(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, lCon
 	rAddr := lConn.LocalAddr()
 
 	// print local -> remote
-	logger.Debugf("[%s] tcp request capture by proxy successfully, "+
+	logger.Infof("[%s] tcp request capture by proxy successfully, "+
 		"local[%s] -> remote [%s]", proxyTyp, lAddr.String(), rAddr.String())
 
 	// make key to mark this connection

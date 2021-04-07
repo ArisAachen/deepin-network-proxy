@@ -198,5 +198,5 @@ func NewHandler(proto ProtoTyp, scope define.Scope, key HandlerKey, proxy Config
 
 func init() {
 	logger = log.NewLogger("daemon/proxy")
-	logger.SetLogLevel(log.LevelDebug)
+	logger.SetLogLevel(log.LevelInfo)
 }

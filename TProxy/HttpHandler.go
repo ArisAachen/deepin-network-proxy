@@ -82,7 +82,7 @@ func (handler *HttpHandler) Tunnel() error {
 		return fmt.Errorf("proxy response error, status code: %v, message: %s",
 			resp.StatusCode, resp.Status)
 	}
-	logger.Debugf("[http] proxy: tunnel create success, [%s] -> [%s] -> [%s]",
+	logger.Infof("[http] proxy: tunnel create success, [%s] -> [%s] -> [%s]",
 		handler.lAddr.String(), rConn.RemoteAddr(), handler.rAddr.String())
 	// save rConn handler
 	handler.rConn = rConn

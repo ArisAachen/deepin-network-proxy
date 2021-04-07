@@ -33,5 +33,5 @@ func (m *Manager) CreateRoute(name string, node RouteNodeSpec, info RouteInfoSpe
 
 func init() {
 	logger = log.NewLogger("damon/route")
-	logger.SetLogLevel(log.LevelDebug)
+	logger.SetLogLevel(log.LevelInfo)
 }

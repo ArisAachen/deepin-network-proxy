@@ -57,5 +57,5 @@ func newProxy(scope define.Scope) BaseProxy {
 
 func init() {
 	logger = log.NewLogger("daemon/proxy")
-	logger.SetLogLevel(log.LevelDebug)
+	logger.SetLogLevel(log.LevelInfo)
 }

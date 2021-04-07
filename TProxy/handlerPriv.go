@@ -87,7 +87,7 @@ func (pr *handlerPrv) dialProxy() (net.Conn, error) {
 		logger.Warningf("[%s] dial proxy server failed, err: %v", pr.typ, err)
 		return nil, err
 	}
-	logger.Debugf("[%s] dial proxy server success, local [%s] -> remote [%s]", pr.typ, conn.LocalAddr(), conn.RemoteAddr())
+	logger.Infof("[%s] dial proxy server success, local [%s] -> remote [%s]", pr.typ, conn.LocalAddr(), conn.RemoteAddr())
 	return conn, nil
 }
 
@@ -144,10 +144,10 @@ func (pr *handlerPrv) ReadLocal(buf []byte) error {
 // communicate lConn and rConn
 func (pr *handlerPrv) Communicate() {
 	go func() {
-		logger.Debugf("[%s] begin copy data, local [%s] -> remote [%s]", pr.typ, pr.lAddr.String(), pr.rAddr.String())
+		logger.Infof("[%s] begin copy data, local [%s] -> remote [%s]", pr.typ, pr.lAddr.String(), pr.rAddr.String())
 		_, err := io.Copy(pr.lConn, pr.rConn)
 		if err != nil {
-			logger.Debugf("[%s] stop copy data, local [%s] -x- remote [%s], reason: %v", pr.typ, pr.lAddr.String(), pr.rAddr.String(), err)
+			logger.Infof("[%s] stop copy data, local [%s] -x- remote [%s], reason: %v", pr.typ, pr.lAddr.String(), pr.rAddr.String(), err)
 		}
 		// mark deleted, but not actually deleted at this time, only set a mark
 		if pr.isDeleted() {
@@ -158,10 +158,10 @@ func (pr *handlerPrv) Communicate() {
 		pr.Remove()
 	}()
 	go func() {
-		logger.Debugf("[%s] begin copy data, remote [%s] -> local [%s]", pr.typ, pr.rAddr.String(), pr.lAddr.String())
+		logger.Infof("[%s] begin copy data, remote [%s] -> local [%s]", pr.typ, pr.rAddr.String(), pr.lAddr.String())
 		_, err := io.Copy(pr.rConn, pr.lConn)
 		if err != nil {
-			logger.Debugf("[%s] stop copy data, remote [%s] -x- local [%s], reason: %v", pr.typ, pr.rAddr.String(), pr.lAddr.String(), err)
+			logger.Infof("[%s] stop copy data, remote [%s] -x- local [%s], reason: %v", pr.typ, pr.rAddr.String(), pr.lAddr.String(), err)
 		}
 		// mark deleted, but not actually deleted at this time, only set a mark
 		if pr.isDeleted() {

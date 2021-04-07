@@ -84,7 +84,7 @@ func SetConnOptTrn(conn net.Conn) error {
 	if !ok {
 		return errors.New("convert file failed")
 	}
-	defer file.Close()
+	// defer file.Close()
 	// set sock opt trn
 	return SetSockOptTrn(int(file.Fd()))
 }
