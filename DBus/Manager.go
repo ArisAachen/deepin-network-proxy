@@ -187,14 +187,34 @@ func (m *Manager) initIptables() error {
 	outputChain := m.iptablesMgr.GetChain("mangle", "OUTPUT")
 	// create main chain to manager all children chain
 	// sudo iptables -t mangle -N Main
-	// sudo iptables -t mangle -A OUTPUT -j main
+	// sudo iptables -t mangle -A OUTPUT -j Main
 	m.mainChain, err = outputChain.CreateChild(define.Main.String(), 0, &newIptables.CompleteRule{Action: define.Main.String()})
 	if err != nil {
 		logger.Warningf("init iptables failed, err: %v", err)
 		return err
 	}
+	// dont proxy local lo
+	// sudo iptables -t mangle -A Main 1 -o lo -j RETURN
+	base := newIptables.BaseRule{
+		// -o
+		Match: "o",
+		// "lo"
+		Param: "lo",
+	}
+	cpl := &newIptables.CompleteRule{
+		Action: newIptables.RETURN,
+		BaseSl: []newIptables.BaseRule{base},
+		ExtendsSl: nil,
+	}
+	// append rule
+	err = m.mainChain.AppendRule(cpl)
+	if err != nil {
+		logger.Warningf("init iptables failed, err: %v", err)
+		return err
+	}
+
 	// mainChain add default rule
-	// iptables -t mangle -A All_Entry -m cgroup --path main.slice -j RETURN
+	// iptables -t mangle -A Main -m cgroup --path main.slice -j RETURN
 	extends := newIptables.ExtendsRule{
 		// -m
 		Match: "m",
@@ -209,7 +229,7 @@ func (m *Manager) initIptables() error {
 		},
 	}
 	// one complete rule
-	cpl := &newIptables.CompleteRule{
+	cpl = &newIptables.CompleteRule{
 		// -j RETURN
 		Action: newIptables.RETURN,
 		BaseSl: nil,

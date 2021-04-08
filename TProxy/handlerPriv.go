@@ -2,6 +2,7 @@ package TProxy
 
 import (
 	"errors"
+	"io"
 	"net"
 	"strconv"
 	"sync"
@@ -143,80 +144,32 @@ func (pr *handlerPrv) ReadLocal(buf []byte) error {
 // communicate lConn and rConn
 func (pr *handlerPrv) Communicate() {
 	go func() {
-
-
-		logger.Info(pr.rAddr.String())
-
-		if pr.rAddr.String() != "10.20.31.129:12345" {
+		logger.Infof("[%s] begin copy data, remote [%s] -> local [%s]", pr.typ, pr.rAddr.String(), pr.lAddr.String())
+		_, err := io.Copy(pr.rConn, pr.lConn)
+		if err != nil {
+			logger.Infof("[%s] stop copy data, remote [%s] -x- local [%s], reason: %v", pr.typ, pr.rAddr.String(), pr.lAddr.String(), err)
+		}
+		// mark deleted, but not actually deleted at this time, only set a mark
+		if pr.isDeleted() {
 			return
 		}
-
-		for {
-			buf := make([]byte, 512)
-			_, err := pr.rConn.Read(buf)
-			if err != nil {
-				logger.Warningf("read remote failed")
-				break
-			}
-			logger.Infof("read remote success, %v", string(buf))
-			_, err = pr.lConn.Write(buf)
-			if err != nil {
-				logger.Warningf("write local failed")
-				break
-			}
-
-
-			logger.Infof("write local success, %v", string(buf))
-		}
-
-		//logger.Infof("[%s] begin copy data, remote [%s] -> local [%s]", pr.typ, pr.rAddr.String(), pr.lAddr.String())
-		//_, err := io.Copy(pr.rConn, pr.lConn)
-		//if err != nil {
-		//	logger.Infof("[%s] stop copy data, remote [%s] -x- local [%s], reason: %v", pr.typ, pr.rAddr.String(), pr.lAddr.String(), err)
-		//}
-		//// mark deleted, but not actually deleted at this time, only set a mark
-		//if pr.isDeleted() {
-		//	return
-		//}
-		//pr.setDeleted(true)
-		//// remove handler from map
-		//pr.Remove()
+		pr.setDeleted(true)
+		// remove handler from map
+		pr.Remove()
 	}()
 	go func() {
-		logger.Info(pr.rAddr.String())
-
-		if pr.rAddr.String() != "10.20.31.129:12345" {
+		logger.Infof("[%s] begin copy data, local [%s] -> remote [%s]", pr.typ, pr.lAddr.String(), pr.rAddr.String())
+		_, err := io.Copy(pr.lConn, pr.rConn)
+		if err != nil {
+			logger.Infof("[%s] stop copy data, local [%s] -x- remote [%s], reason: %v", pr.typ, pr.lAddr.String(), pr.rAddr.String(), err)
+		}
+		// mark deleted, but not actually deleted at this time, only set a mark
+		if pr.isDeleted() {
 			return
 		}
-
-		for {
-			buf := make([]byte, 512)
-			_, err := pr.lConn.Read(buf)
-			if err != nil {
-				logger.Warningf("read local failed")
-				break
-			}
-			logger.Infof("read local success, %v", string(buf))
-			_, err = pr.rConn.Write(buf)
-			if err != nil {
-				logger.Warningf("write remote failed")
-				break
-			}
-			logger.Infof("write remote success, %v", string(buf))
-		}
-
-		//logger.Infof("[%s] begin copy data, local [%s] -> remote [%s]", pr.typ, pr.lAddr.String(), pr.rAddr.String())
-		//_, err := io.Copy(pr.lConn, pr.rConn)
-		//if err != nil {
-		//	logger.Infof("[%s] stop copy data, local [%s] -x- remote [%s], reason: %v", pr.typ, pr.lAddr.String(), pr.rAddr.String(), err)
-		//}
-		//// mark deleted, but not actually deleted at this time, only set a mark
-		//if pr.isDeleted() {
-		//	return
-		//}
-		//pr.setDeleted(true)
-		//// remove handler from map
-		//pr.Remove()
+		pr.setDeleted(true)
+		// remove handler from map
+		pr.Remove()
 	}()
 }
 

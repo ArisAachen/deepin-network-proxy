@@ -4,7 +4,7 @@ all-proxies:
       http:
       - prototype: http
         name: http_1
-        server: 10.20.31.129
+        server: 10.20.31.158
         port: 808
       - prototype: http
         name: http_2
@@ -53,7 +53,7 @@ all-proxies:
       http:
       - prototype: http
         name: http_1
-        server: 10.20.31.129
+        server: 10.20.31.158
         port: 808
       - prototype: http
         name: http_2

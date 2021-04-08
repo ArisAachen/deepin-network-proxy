@@ -388,5 +388,5 @@ func CreateProcsService() error {
 
 func init() {
 	logger = log.NewLogger("system/proc")
-	logger.SetLogLevel(log.LevelInfo)
+	logger.SetLogLevel(log.LevelDebug)
 }
