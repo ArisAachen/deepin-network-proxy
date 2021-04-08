@@ -60,19 +60,24 @@ func (handler *HttpHandler) Tunnel() error {
 	// check if need auth
 	if auth.user != "" && auth.password != "" {
 		authMsg := auth.user + ":" + auth.password
-		req.Header.Add("dde-proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(authMsg)))
+		req.Header.Add("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(authMsg)))
 	}
 	// send connect request to rConn to create tunnel
+	logger.Infof("[http] req is %v", req)
 	err = req.Write(rConn)
 	if err != nil {
 		logger.Warningf("[http] write http tunnel request failed, err: %v", err)
 		return err
 	}
+	logger.Info("[http] write req success")
 	// read response
 	reader := bufio.NewReader(rConn)
 	resp, err := http.ReadResponse(reader, req)
 	if err != nil {
+		logger.Warningf("[http] read response failed, err: %v", err)
 		return err
+	} else {
+		logger.Info("[http] read response success")
 	}
 	logger.Debug(resp.Status)
 	// close body

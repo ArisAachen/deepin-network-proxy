@@ -101,5 +101,5 @@ func (m *Manager) GetChain(tName string, cName string) *Chain {
 // init
 func init() {
 	logger = log.NewLogger("daemon/iptables")
-	logger.SetLogLevel(log.LevelInfo)
+	logger.SetLogLevel(log.LevelDebug)
 }

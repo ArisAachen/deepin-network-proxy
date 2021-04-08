@@ -4,10 +4,8 @@ all-proxies:
       http:
       - prototype: http
         name: http_1
-        server: 10.20.31.158
+        server: 10.20.31.129
         port: 808
-        username: uos
-        password: "12345678"
       - prototype: http
         name: http_2
         server: 10.20.31.132
@@ -30,7 +28,7 @@ all-proxies:
       sock5:
       - prototype: sock5
         name: sock5_1
-        server: 10.20.31.158
+        server: 10.20.31.154
         port: 1080
         username: uos
         password: "12345678"
@@ -55,10 +53,8 @@ all-proxies:
       http:
       - prototype: http
         name: http_1
-        server: 10.20.31.158
+        server: 10.20.31.129
         port: 808
-        username: uos
-        password: "12345678"
       - prototype: http
         name: http_2
         server: 10.20.31.132

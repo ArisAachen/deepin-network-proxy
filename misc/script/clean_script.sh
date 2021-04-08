@@ -30,7 +30,7 @@ clear_global_iptables(){
    ## clear global chain
     iptables -t mangle -F Global
     ## detach global chain from main
-    iptables -t mangle -D Main -j Global -p tcp -m cgroup --path Global.slice
+    iptables -t mangle -D Main -j Global -p tcp -m cgroup ! --path Global.slice
     ## remove chain
     iptables -t mangle -X Global
 
