@@ -2,7 +2,6 @@ package DBus
 
 import (
 	"fmt"
-
 	com "github.com/DeepinProxy/Com"
 	config "github.com/DeepinProxy/Config"
 	define "github.com/DeepinProxy/Define"
@@ -73,11 +72,15 @@ func (mgr *AppProxy) addProxyApps(apps []string) error {
 
 	// add app
 	for _, app := range apps {
+		realPath, err := parseDesktopPath(app)
+		if err != nil {
+			continue
+		}
 		// check if already exist
-		if com.MegaExist(mgr.Proxies.ProxyProgram, app) {
+		if com.MegaExist(mgr.Proxies.ProxyProgram, realPath) {
 			return nil
 		}
-		mgr.Proxies.ProxyProgram = append(mgr.Proxies.ProxyProgram, app)
+		mgr.Proxies.ProxyProgram = append(mgr.Proxies.ProxyProgram, realPath)
 		// check if is in proxying
 		if !mgr.Enabled {
 			return nil
@@ -86,30 +89,30 @@ func (mgr *AppProxy) addProxyApps(apps []string) error {
 		// controller
 
 		// get origin controller
-		controller := mgr.manager.controllerMgr.GetControllerByCtlPath(app)
+		controller := mgr.manager.controllerMgr.GetControllerByCtlPath(realPath)
 		if controller == nil {
 			// add path
-			mgr.controller.AddCtlAppPath(app)
+			mgr.controller.AddCtlAppPath(realPath)
 			// get proc message
-			procSl, ok := procsMap[app]
+			procSl, ok := procsMap[realPath]
 			if !ok {
 				continue
 			}
 			// if not empty, move in
-			err := mgr.controller.MoveIn(app, procSl)
+			err := mgr.controller.MoveIn(realPath, procSl)
 			if err != nil {
-				logger.Warningf("[%s] add procs %s at add proxy apps failed, err: %v", mgr.scope, app, err)
+				logger.Warningf("[%s] add procs %s at add proxy apps failed, err: %v", mgr.scope, realPath, err)
 				continue
 			}
-			logger.Debugf("[%s] add procs %s at add proxy apps success", mgr.scope, app)
+			logger.Debugf("[%s] add procs %s at add proxy apps success", mgr.scope, realPath)
 		} else {
-			err = mgr.controller.UpdateFromManager(app)
+			err = mgr.controller.UpdateFromManager(realPath)
 			if err != nil {
-				logger.Warningf("[%s] add proc %s from %s at add proxy apps failed, err: %v", mgr.scope, app, controller.Name, err)
+				logger.Warningf("[%s] add proc %s from %s at add proxy apps failed, err: %v", mgr.scope, realPath, controller.Name, err)
 			} else {
-				logger.Debugf("[%s] add proc %s from %s at add proxy apps success", mgr.scope, app, controller.Name)
+				logger.Debugf("[%s] add proc %s from %s at add proxy apps success", mgr.scope, realPath, controller.Name)
 			}
-			mgr.controller.AddCtlAppPath(app)
+			mgr.controller.AddCtlAppPath(realPath)
 		}
 
 		//err := mgr.controller.UpdateFromManager(app)
@@ -132,14 +135,18 @@ func (mgr *AppProxy) DelProxyApps(apps []string) *dbus.Error {
 func (mgr *AppProxy) delProxyApps(apps []string) error {
 	// add app
 	for _, app := range apps {
+		realPath, err := parseDesktopPath(app)
+		if err != nil {
+			continue
+		}
 		// check if already exist
-		if !com.MegaExist(mgr.Proxies.ProxyProgram, app) {
+		if !com.MegaExist(mgr.Proxies.ProxyProgram, realPath) {
 			return nil
 		}
 		// mega del
-		ifc, _, err := com.MegaDel(mgr.Proxies.ProxyProgram, app)
+		ifc, _, err := com.MegaDel(mgr.Proxies.ProxyProgram, realPath)
 		if err != nil {
-			logger.Warningf("[%s] del proxy app %s failed, err: %v", mgr.scope, app, err)
+			logger.Warningf("[%s] del proxy app %s failed, err: %v", mgr.scope, realPath, err)
 			return err
 		}
 		temp, ok := ifc.([]string)
@@ -149,7 +156,7 @@ func (mgr *AppProxy) delProxyApps(apps []string) error {
 		mgr.Proxies.ProxyProgram = temp
 		_ = mgr.writeConfig()
 		// controller
-		err = mgr.controller.ReleaseToManager(app)
+		err = mgr.controller.ReleaseToManager(realPath)
 		if err != nil {
 			return dbusutil.ToError(err)
 		}
