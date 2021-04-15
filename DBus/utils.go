@@ -1,13 +1,12 @@
 package DBus
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
-	"errors"
 	config "github.com/DeepinProxy/Config"
-	"io"
-	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"pkg.deepin.io/lib/appinfo/desktopappinfo"
 	"strings"
 )
 
@@ -21,37 +20,34 @@ func UnMarshalProxy(buf []byte) (config.Proxy, error) {
 	return proxy, nil
 }
 
-
 // parse .desktop file to get real path
 func parseDesktopPath(app string) (string, error) {
 	if !strings.HasSuffix(app, ".desktop") {
 		return app, nil
 	}
-	buf, err := ioutil.ReadFile(app)
+	// make desktop app info message
+	appInfo, err := desktopappinfo.NewDesktopAppInfoFromFile(app)
 	if err != nil {
-		// if read failed, r
-		logger.Warningf("read desktop file %s failed, err: %v", app, err)
+		logger.Warningf("read desktop file failed, err: %v", err)
 		return "", err
 	}
-	reader := bufio.NewReader(bytes.NewBuffer(buf))
-	for {
-		msgBuf, _, err := reader.ReadLine()
-		if err != io.EOF {
-			logger.Debugf("read end file %s, cant find Exec path", app)
-			return "", nil
-		} else if err != nil {
-			logger.Warningf("read buf %s failed, err: %v", app, err)
+	// get table
+	table := appInfo.GetExecutable()
+	// check if is absolute path
+	if filepath.IsAbs(table) {
+		// check if exist
+		_, err := os.Stat(table)
+		if err != nil {
+			logger.Warningf("exe path %s error, err: %v", table, err)
+			return "", err
 		}
-		msg := string(msgBuf)
-		// find Exec=/xxx/xxx xxx
-		if strings.HasPrefix(msg, "Exec") {
-			msgSl := strings.Split(msg, "=")
-			if len(msgSl) < 2 {
-				logger.Warningf("read path %s failed, dont include exec path", app)
-				return "", errors.New("exec path dont defined")
-			}
-			exePathSl := strings.Split(msgSl[1], " ")
-			return exePathSl[0], nil
-		}
+		return table, nil
 	}
+	// if is not absolute
+	table, err = exec.LookPath(table)
+	if err != nil {
+		logger.Warningf("look path failed, err: %v", err)
+		return "", err
+	}
+	return table, err
 }

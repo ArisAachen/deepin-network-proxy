@@ -94,7 +94,7 @@ func (r *Route) action(action action) ([]byte, error) {
 		args = append(args, "table", r.table)
 	}
 	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
-	logger.Debugf("[%s] begin to run command %s", r.table, cmd.String())
+	logger.Debugf("[%s] begin to run command %v", r.table, cmd)
 	return cmd.CombinedOutput()
 }
 
@@ -223,7 +223,7 @@ func (rule *Rule) action(action action) ([]byte, error) {
 		args = append(args, "table", rule.route.table)
 	}
 	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
-	logger.Debugf("[rule] run command %s", cmd.String())
+	logger.Debugf("[rule] run command %v", cmd)
 	return cmd.CombinedOutput()
 }
 

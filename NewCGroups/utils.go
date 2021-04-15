@@ -15,7 +15,7 @@ func attach(pid string, path string) error {
 	args := []string{"echo", pid, ">", path}
 	// echo 12345 > /sys/fs/cgroup/unified/App.slice/cgroup.procs
 	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
-	logger.Debugf("echo pid %s run command %s", pid, cmd.String())
+	logger.Debugf("echo pid %s run command %v", pid, cmd)
 	buf, err := cmd.CombinedOutput()
 	if err != nil {
 		logger.Warningf("echo pid %s to cgroups %s failed, out: %s,err: %v", pid, path, string(buf), err)

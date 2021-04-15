@@ -29,7 +29,7 @@ func (t *Table) runCommand(operation Operation, chain *Chain, index int, cpl *Co
 		args = append(args, cpl.String())
 	}
 	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
-	logger.Debugf("[%s] begin to run begin to run command: %s", t.Name, cmd.String())
+	logger.Debugf("[%s] begin to run begin to run command: %v", t.Name, cmd)
 	buf, err := cmd.CombinedOutput()
 	if err != nil {
 		logger.Warningf("[%s] run command failed, out: %s, err:%v", t.Name, string(buf), err)

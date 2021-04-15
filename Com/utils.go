@@ -123,7 +123,7 @@ type BaseAddr struct {
 	Port int
 }
 
-// parse origin remote addr msg from msg_hdr
+// ParseRemoteAddrFromMsgHdr parse origin remote addr msg from msg_hdr
 func ParseRemoteAddrFromMsgHdr(buf []byte) (*BaseAddr, error) {
 	var addr *BaseAddr
 	if buf == nil {
@@ -609,7 +609,7 @@ func RunScript(path string, params []string) ([]byte, error) {
 	args := []string{path}
 	args = append(args, params...)
 	cmd := exec.Command("/bin/sh", "-c", strings.Join(args, " "))
-	log.Println(cmd.String())
+	log.Println(cmd.Args)
 	buf, err := cmd.CombinedOutput()
 	if err != nil {
 		return buf, err
