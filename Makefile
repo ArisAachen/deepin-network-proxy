@@ -7,7 +7,7 @@ PROXYFILE=deepin-proxy
 DAEMON=deepin-daemon
 
 GOPATH_DIR=gopath
-GOPKG_PREFIX=github.com/DeepinProxy
+GOPKG_PREFIX=github.com/ArisAachen/deepin-network-proxy
 
 GOBUILD = go build $(GO_BUILD_FLAGS)
 
@@ -22,7 +22,7 @@ prepare:
 
 Out/%:  prepare
 	echo $GOPATH
-	env GOPATH="${CURDIR}/${GOPATH_DIR}:${GOPATH}" ${GOBUILD} -o bin/${@F} ${GOPKG_PREFIX}/Out/${@F}
+	env GOPATH="${CURDIR}/${GOPATH_DIR}:${GOPATH}" ${GOBUILD} -o bin/${@F} ${GOPKG_PREFIX}/out/${@F}
 
 install:
 	mkdir -p ${PREFIXETC}/${DEEPIN}/${PROXYFILE}
