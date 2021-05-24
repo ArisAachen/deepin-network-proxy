@@ -20,7 +20,7 @@ import (
 type Manager struct {
 
 	// dbus
-	procsService *netlink.Procs
+	procsService netlink.Procs
 	sesService   *dbusutil.Service
 	sysService   *dbusutil.Service
 	sigLoop      *dbusutil.SignalLoop

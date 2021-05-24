@@ -33,21 +33,27 @@ func parseDesktopPath(app string) (string, error) {
 	}
 	// get table
 	table := appInfo.GetExecutable()
-	// check if is absolute path
-	if filepath.IsAbs(table) {
-		// check if exist
-		_, err := os.Stat(table)
+	// get absolute path
+	if !filepath.IsAbs(table) {
+		// if is not absolute
+		table, err = exec.LookPath(table)
 		if err != nil {
-			logger.Warningf("exe path %s error, err: %v", table, err)
+			logger.Warningf("look path failed, err: %v", err)
 			return "", err
 		}
-		return table, nil
 	}
-	// if is not absolute
-	table, err = exec.LookPath(table)
+	stat, err := os.Lstat(table)
 	if err != nil {
-		logger.Warningf("look path failed, err: %v", err)
+		logger.Warningf("exe path %s error, err: %v", table, err)
 		return "", err
 	}
-	return table, err
+	if stat.Mode()&os.ModeSymlink != 0 {
+		logger.Debugf("exe path %s is link, get real path", table)
+		table, err = os.Readlink(table)
+		if err != nil {
+			logger.Warningf("read link failed, err: %v", err)
+			return "", err
+		}
+	}
+	return table,nil
 }

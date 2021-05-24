@@ -7,6 +7,8 @@ Build-Depends:
  dh-golang,
  golang-any,
  golang-dlib-dev,
+ golang-gopkg-check.v1-dev,
+ golang-gopkg-yaml.v2-dev,
  golang-github-linuxdeepin-go-dbus-factory-dev,
  golang-github-stretchr-testify-dev,
  golang-go | gccgo-5,

@@ -79,10 +79,6 @@ func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error
 		go mgr.readMsgUDP(proxyTyp, proxy, packetConn)
 	}
 
-	go func() {
-		_ = mgr.startRedirect()
-	}()
-
 	// mark enable
 	mgr.Enabled = true
 
@@ -110,10 +106,6 @@ func (mgr *proxyPrv) StopProxy() *dbus.Error {
 			logger.Warningf("[%s] stop proxy udp handler failed, err: %v", mgr.scope, err)
 		}
 	}
-
-	go func() {
-		_ = mgr.stopRedirect()
-	}()
 
 	mgr.Enabled = false
 	return nil
