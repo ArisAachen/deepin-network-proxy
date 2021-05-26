@@ -18,6 +18,7 @@ type BaseProxy interface {
 	ClearProxy() *dbus.Error
 	GetProxy() (string, *dbus.Error)
 	AddProxy(proto string, name string, jsonProxy []byte) *dbus.Error
+	GetCGroups() (string, *dbus.Error)
 
 	// manager
 	loadConfig()

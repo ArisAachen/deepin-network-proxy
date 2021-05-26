@@ -1,7 +1,6 @@
 package DBus
 
 import (
-	"errors"
 	com "github.com/ArisAachen/deepin-network-proxy/com"
 	"os"
 	"path/filepath"
@@ -12,7 +11,6 @@ import (
 	route "github.com/ArisAachen/deepin-network-proxy/ip_route"
 	newCGroups "github.com/ArisAachen/deepin-network-proxy/new_cgroups"
 	newIptables "github.com/ArisAachen/deepin-network-proxy/new_iptables"
-	netlink "github.com/linuxdeepin/go-dbus-factory/com.deepin.system.procs"
 	"pkg.deepin.io/lib/dbusutil"
 )
 
@@ -20,10 +18,10 @@ import (
 type Manager struct {
 
 	// dbus
-	procsService netlink.Procs
+	// procsService netlink.Procs
 	sesService   *dbusutil.Service
 	sysService   *dbusutil.Service
-	sigLoop      *dbusutil.SignalLoop
+	// sigLoop      *dbusutil.SignalLoop
 
 	// proxy handler
 	handler []BaseProxy
@@ -66,8 +64,8 @@ func (m *Manager) Init() error {
 	// store service
 	m.sysService = sysService
 	// attach dbus objects
-	m.procsService = netlink.NewProcs(sysService.Conn())
-	m.sigLoop = dbusutil.NewSignalLoop(sysService.Conn(), 10)
+	// m.procsService = netlink.NewProcs(sysService.Conn())
+	// m.sigLoop = dbusutil.NewSignalLoop(sysService.Conn(), 10)
 	return nil
 }
 
@@ -168,13 +166,6 @@ func (m *Manager) Start() {
 
 		// init route
 		_ = m.initRoute()
-
-		err := m.Listen()
-		if err != nil {
-			logger.Warning("init iptables failed, err: %v", err)
-		}
-
-		_ = m.firstAdjustCGroups()
 	})
 }
 
@@ -283,100 +274,100 @@ func (m *Manager) initRoute() error {
 // format current procs
 func (m *Manager) GetAllProcs() (map[string]newCGroups.ControlProcSl, error) {
 	// check service
-	if m.procsService == nil {
-		logger.Warning("[manager] get procs failed, service not init")
-		return nil, errors.New("service not init")
-	}
+	//if m.procsService == nil {
+	//	logger.Warning("[manager] get procs failed, service not init")
+	//	return nil, errors.New("service not init")
+	//}
 	// get procs message
 	// map[pid]{pid exec cgroups}
-	procs, err := m.procsService.Procs().Get(0)
-	if err != nil {
-		logger.Warningf("[%s] get procs failed, err: %v", "manager", err)
-		return nil, err
-	}
+	//procs, err := m.procsService.Procs().Get(0)
+	//if err != nil {
+	//	logger.Warningf("[%s] get procs failed, err: %v", "manager", err)
+	//	return nil, err
+	//}
 	// map[exec][pid exec cgroups]
-	ctrlProcMap := make(map[string]newCGroups.ControlProcSl)
-	for _, proc := range procs {
-		execPath := proc.ExecPath
-		ctrlProcSl, ok := ctrlProcMap[execPath]
-		// if not exist, add one
-		if !ok {
-			ctrlProcSl = newCGroups.ControlProcSl{}
-			// ctrlProcMap[execPath] = ctrlProcSl
-		}
-		// append
-		var temp netlink.ProcMessage = proc
-		ctrlProcSl = append(ctrlProcSl, &temp)
-		ctrlProcMap[execPath] = ctrlProcSl
-	}
-	return ctrlProcMap, nil
+	//ctrlProcMap := make(map[string]newCGroups.ControlProcSl)
+	//for _, proc := range procs {
+	//	execPath := proc.ExecPath
+	//	ctrlProcSl, ok := ctrlProcMap[execPath]
+	//	// if not exist, add one
+	//	if !ok {
+	//		ctrlProcSl = newCGroups.ControlProcSl{}
+	//		// ctrlProcMap[execPath] = ctrlProcSl
+	//	}
+	//	// append
+	//	var temp netlink.ProcMessage = proc
+	//	ctrlProcSl = append(ctrlProcSl, &temp)
+	//	ctrlProcMap[execPath] = ctrlProcSl
+	//}
+	return nil, nil
 }
 
 // start listen
 func (m *Manager) Listen() error {
-	m.sigLoop.Start()
-	m.procsService.InitSignalExt(m.sigLoop, true)
-	_, err := m.procsService.ConnectExecProc(func(execPath string, cgroupPath string, pid string, ppid string) {
-		proc := &netlink.ProcMessage{
-			ExecPath:   execPath,
-			CGroupPath: cgroupPath,
-			Pid:        pid,
-			PPid:       ppid,
-		}
-		logger.Debugf("listen exec proc %v", proc)
-		// check if is child proc
-		controller := m.controllerMgr.GetControllerByCtrlByPPid(ppid)
-		if controller != nil {
-			// cover proc
-			parent := controller.CheckCtrlPid(ppid)
-			proc.ExecPath = parent.ExecPath
-			proc.CGroupPath = parent.CGroupPath
-			// add to
-			err := controller.AddCtrlProc(proc)
-			if err != nil {
-				logger.Warningf("[%s] add exec %s to cgroups failed, err: %v", controller.Name, execPath, err)
-			}
-			return
-		}
-
-		// search controller according to exe path, get highest priority one
-		controller = m.controllerMgr.GetControllerByCtlPath(execPath)
-		if controller == nil {
-			return
-		}
-		logger.Infof("start proc %s need add to proxy", execPath)
-		// add to cgroups.procs and save
-		err := controller.AddCtrlProc(proc)
-		if err != nil {
-			logger.Warningf("[%s] add exec %s to cgroups failed, err: %v", controller.Name, execPath, err)
-		}
-
-	})
-	if err != nil {
-		logger.Warningf("connect exec proc failed, err: %v")
-		return err
-	}
-	_, err = m.procsService.ConnectExitProc(func(execPath string, cgroupPath string, pid string, ppid string) {
-		// search controller according to exe path
-		logger.Debugf("listen exit proc %v", execPath)
-		controller := m.controllerMgr.GetControllerByCtlPath(execPath)
-		if controller == nil {
-			return
-		}
-		proc := &netlink.ProcMessage{
-			ExecPath:   execPath,
-			CGroupPath: cgroupPath,
-			Pid:        pid,
-			PPid:       ppid,
-		}
-		logger.Infof("start proc %s need remove from proxy", execPath)
-		// del from save
-		err := controller.DelCtlProc(proc)
-		if err != nil {
-			logger.Warningf("[%s] del exec %s from cgroups failed, err: %v", controller.Name, execPath, err)
-		}
-
-	})
+	//m.sigLoop.Start()
+	//m.procsService.InitSignalExt(m.sigLoop, true)
+	//_, err := m.procsService.ConnectExecProc(func(execPath string, cgroupPath string, pid string, ppid string) {
+	//	proc := &netlink.ProcMessage{
+	//		ExecPath:   execPath,
+	//		CGroupPath: cgroupPath,
+	//		Pid:        pid,
+	//		PPid:       ppid,
+	//	}
+	//	logger.Debugf("listen exec proc %v", proc)
+	//	// check if is child proc
+	//	controller := m.controllerMgr.GetControllerByCtrlByPPid(ppid)
+	//	if controller != nil {
+	//		// cover proc
+	//		parent := controller.CheckCtrlPid(ppid)
+	//		proc.ExecPath = parent.ExecPath
+	//		proc.CGroupPath = parent.CGroupPath
+	//		// add to
+	//		err := controller.AddCtrlProc(proc)
+	//		if err != nil {
+	//			logger.Warningf("[%s] add exec %s to cgroups failed, err: %v", controller.Name, execPath, err)
+	//		}
+	//		return
+	//	}
+	//
+	//	// search controller according to exe path, get highest priority one
+	//	controller = m.controllerMgr.GetControllerByCtlPath(execPath)
+	//	if controller == nil {
+	//		return
+	//	}
+	//	logger.Infof("start proc %s need add to proxy", execPath)
+	//	// add to cgroups.procs and save
+	//	err := controller.AddCtrlProc(proc)
+	//	if err != nil {
+	//		logger.Warningf("[%s] add exec %s to cgroups failed, err: %v", controller.Name, execPath, err)
+	//	}
+	//
+	//})
+	//if err != nil {
+	//	logger.Warningf("connect exec proc failed, err: %v")
+	//	return err
+	//}
+	//_, err = m.procsService.ConnectExitProc(func(execPath string, cgroupPath string, pid string, ppid string) {
+	//	// search controller according to exe path
+	//	logger.Debugf("listen exit proc %v", execPath)
+	//	controller := m.controllerMgr.GetControllerByCtlPath(execPath)
+	//	if controller == nil {
+	//		return
+	//	}
+	//	proc := &netlink.ProcMessage{
+	//		ExecPath:   execPath,
+	//		CGroupPath: cgroupPath,
+	//		Pid:        pid,
+	//		PPid:       ppid,
+	//	}
+	//	logger.Infof("start proc %s need remove from proxy", execPath)
+	//	// del from save
+	//	err := controller.DelCtlProc(proc)
+	//	if err != nil {
+	//		logger.Warningf("[%s] del exec %s from cgroups failed, err: %v", controller.Name, execPath, err)
+	//	}
+	//
+	//})
 	return nil
 }
 
@@ -387,9 +378,9 @@ func (m *Manager) release() error {
 		return nil
 	}
 	// remove all handler
-	m.procsService.RemoveAllHandlers()
+	// m.procsService.RemoveAllHandlers()
 	// stop loop
-	m.sigLoop.Stop()
+	// m.sigLoop.Stop()
 
 	// remove chain
 	err := m.mainChain.Remove()
@@ -399,13 +390,13 @@ func (m *Manager) release() error {
 	}
 	m.iptablesMgr = nil
 
-	// release all control procs
-	err = m.mainController.ReleaseAll()
-	if err != nil {
-		logger.Warning("[manager] release all control procs failed, err:", err)
-		return err
-	}
-	m.controllerMgr = nil
+	//// release all control procs
+	//err = m.mainController.ReleaseAll()
+	//if err != nil {
+	//	logger.Warning("[manager] release all control procs failed, err:", err)
+	//	return err
+	//}
+	//m.controllerMgr = nil
 
 	// remove all route
 	err = m.mainRoute.Remove()

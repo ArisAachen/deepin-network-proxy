@@ -82,6 +82,12 @@ func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error
 	// mark enable
 	mgr.Enabled = true
 
+	err = mgr.startRedirect()
+	if err != nil {
+		logger.Warningf("start redirect failed, err: %v", err)
+		return dbusutil.ToError(err)
+	}
+
 	return nil
 }
 
@@ -108,6 +114,13 @@ func (mgr *proxyPrv) StopProxy() *dbus.Error {
 	}
 
 	mgr.Enabled = false
+
+	err := mgr.stopRedirect()
+	if err != nil {
+		logger.Warningf("stop redirect failed, err: %v", err)
+		return dbusutil.ToError(err)
+	}
+
 	return nil
 }
 

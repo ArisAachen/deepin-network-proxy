@@ -3,6 +3,7 @@ package DBus
 import (
 	"fmt"
 	com "github.com/ArisAachen/deepin-network-proxy/com"
+	"os"
 
 	config "github.com/ArisAachen/deepin-network-proxy/config"
 	define "github.com/ArisAachen/deepin-network-proxy/define"
@@ -19,11 +20,12 @@ type GlobalProxy struct {
 	// methods
 	methods *struct {
 		ClearProxy func()
-		SetProxies   func() `in:"proxies" out:"err"`
-		StartProxy   func() `in:"proto,name,udp" out:"err"`
-		StopProxy    func()
-		GetProxy     func() `out:"proxy"`
-		AddProxy     func() `in:"proto,name,proxy"`
+		SetProxies func() `in:"proxies" out:"err"`
+		StartProxy func() `in:"proto,name,udp" out:"err"`
+		StopProxy  func()
+		GetProxy   func() `out:"proxy"`
+		AddProxy   func() `in:"proto,name,proxy"`
+		GetCGroups func() `out:"cgroups"`
 
 		// diff method
 		IgnoreProxyApps   func() `in:"app" out:"err"`
@@ -153,4 +155,15 @@ func (mgr *GlobalProxy) unIgnoreProxyApps(apps []string) error {
 		return nil
 	}
 	return nil
+}
+
+// cgroups
+func (mgr *GlobalProxy) GetCGroups() (string, *dbus.Error) {
+	path := "/sys/fs/cgroup/unified/Global.slice/cgroups.procs"
+	_, err := os.Stat(path)
+	if err != nil {
+		logger.Warningf("app cgroups not exist, err: %v", err)
+		return "", dbusutil.ToError(err)
+	}
+	return path, nil
 }

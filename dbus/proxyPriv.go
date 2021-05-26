@@ -111,13 +111,13 @@ func (mgr *proxyPrv) startRedirect() error {
 	}
 	logger.Debugf("[%s] start tproxy iptables cgroups ipRule success", mgr.scope)
 
-	// first adjust cgroups
-	err = mgr.firstAdjustCGroups()
-	if err != nil {
-		logger.Warningf("[%s] first adjust controller failed, err: %v", mgr.scope, err)
-		return err
-	}
-	logger.Debugf("[%s] first adjust controller success", mgr.scope)
+	//// first adjust cgroups
+	//err = mgr.firstAdjustCGroups()
+	//if err != nil {
+	//	logger.Warningf("[%s] first adjust controller failed, err: %v", mgr.scope, err)
+	//	return err
+	//}
+	//logger.Debugf("[%s] first adjust controller success", mgr.scope)
 	return nil
 }
 
