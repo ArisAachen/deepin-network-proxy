@@ -4,6 +4,7 @@ import (
 	com "github.com/ArisAachen/deepin-network-proxy/com"
 	"os"
 	"path/filepath"
+	"pkg.deepin.io/lib/log"
 	"sync"
 
 	config "github.com/ArisAachen/deepin-network-proxy/config"
@@ -19,8 +20,8 @@ type Manager struct {
 
 	// dbus
 	// procsService netlink.Procs
-	sesService   *dbusutil.Service
-	sysService   *dbusutil.Service
+	sesService *dbusutil.Service
+	sysService *dbusutil.Service
 	// sigLoop      *dbusutil.SignalLoop
 
 	// proxy handler
@@ -121,19 +122,19 @@ func (m *Manager) Export() error {
 	}
 	m.handler = append(m.handler, appProxy)
 
-	// global
-	globalProxy := newProxy(define.Global)
-	// save manager
-	globalProxy.saveManager(m)
-	// load config
-	globalProxy.loadConfig()
-	// export
-	err = globalProxy.export(m.sysService)
-	if err != nil {
-		logger.Warningf("export app proxy failed, err: %v", err)
-		return err
-	}
-	m.handler = append(m.handler, globalProxy)
+	//// global
+	//globalProxy := newProxy(define.Global)
+	//// save manager
+	//globalProxy.saveManager(m)
+	//// load config
+	//globalProxy.loadConfig()
+	//// export
+	//err = globalProxy.export(m.sysService)
+	//if err != nil {
+	//	logger.Warningf("export app proxy failed, err: %v", err)
+	//	return err
+	//}
+	// m.handler = append(m.handler, globalProxy)
 
 	// request dbus service
 	err = m.sysService.RequestName(BusServiceName)
@@ -193,8 +194,8 @@ func (m *Manager) initIptables() error {
 		Param: "lo",
 	}
 	cpl := &newIptables.CompleteRule{
-		Action: newIptables.RETURN,
-		BaseSl: []newIptables.BaseRule{base},
+		Action:    newIptables.RETURN,
+		BaseSl:    []newIptables.BaseRule{base},
 		ExtendsSl: nil,
 	}
 	// append rule
@@ -242,7 +243,7 @@ func (m *Manager) initCGroups() error {
 	m.controllerMgr = newCGroups.NewManager()
 	// create controller
 	var err error
-	m.mainController, err = m.controllerMgr.CreatePriorityController(define.Main, define.MainPriority)
+	m.mainController, err = m.controllerMgr.CreatePriorityController(define.Main, 0, define.MainPriority)
 	if err != nil {
 		logger.Warningf("init cgroup failed, err: %v", err)
 		return err
@@ -469,4 +470,9 @@ func (m *Manager) firstAdjustCGroups() error {
 		}
 	}
 	return nil
+}
+
+func init() {
+	logger = log.NewLogger("daemon/iptables")
+	logger.SetLogLevel(log.LevelDebug)
 }

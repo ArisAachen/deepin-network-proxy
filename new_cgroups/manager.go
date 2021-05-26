@@ -2,6 +2,7 @@ package NewCGroups
 
 import (
 	"errors"
+	"os"
 	"sort"
 
 	com "github.com/ArisAachen/deepin-network-proxy/com"
@@ -24,7 +25,7 @@ func NewManager() *Manager {
 }
 
 // create controller handler
-func (m *Manager) CreatePriorityController(name define.Scope, priority define.Priority) (*Controller, error) {
+func (m *Manager) CreatePriorityController(name define.Scope, uid int, priority define.Priority) (*Controller, error) {
 	if m.CheckControllerExist(name, priority) {
 		return nil, errors.New("controller name or priority already exist")
 	}
@@ -38,6 +39,10 @@ func (m *Manager) CreatePriorityController(name define.Scope, priority define.Pr
 	}
 	// make dir
 	err := com.GuaranteeDir(controller.GetControlPath())
+	if err != nil {
+		return nil, err
+	}
+	err = os.Chown(controller.GetCGroupPath(), uid, 0)
 	if err != nil {
 		return nil, err
 	}

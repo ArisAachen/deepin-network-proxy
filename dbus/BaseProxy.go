@@ -12,7 +12,7 @@ import (
 
 type BaseProxy interface {
 	// DBus method
-	StartProxy(proto string, name string, udp bool) *dbus.Error
+	StartProxy(sender dbus.Sender, proto string, name string, udp bool) *dbus.Error
 	StopProxy() *dbus.Error
 	SetProxies(proxies config.ScopeProxies) *dbus.Error
 	ClearProxy() *dbus.Error

@@ -18,6 +18,9 @@ func (mgr *proxyPrv) GetInterfaceName() string {
 
 // get proxy
 func (mgr *proxyPrv) GetProxy() (string, *dbus.Error) {
+	if mgr.Proxy.ProtoType == "" {
+		return "", nil
+	}
 	buf, err := com.MarshalJson(mgr.Proxy)
 	if err != nil {
 		logger.Warningf("[%s] get proxy failed, err: %v", mgr.scope, err)
@@ -27,7 +30,19 @@ func (mgr *proxyPrv) GetProxy() (string, *dbus.Error) {
 }
 
 // start proxy
-func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error {
+func (mgr *proxyPrv) StartProxy(sender dbus.Sender, proto string, name string, udp bool) *dbus.Error {
+	con, err := dbusutil.NewSystemService()
+	if err != nil {
+		logger.Warningf("get session service failed, err: %v", err)
+		return dbusutil.ToError(err)
+	}
+	uid, err := con.GetConnUID(string(sender))
+	if err != nil {
+		logger.Warningf("get name owner failed, err: %v", err)
+		return dbusutil.ToError(err)
+	}
+	mgr.uid = int(uid)
+
 	// already in proxy
 	if !mgr.stop {
 		logger.Debugf("[%] already in proxy", mgr.scope)
@@ -37,7 +52,6 @@ func (mgr *proxyPrv) StartProxy(proto string, name string, udp bool) *dbus.Error
 	logger.Debugf("[%s] start proxy, proto [%s] name [%s] udp [%v]", mgr.scope, proto, name, udp)
 	// check if proto is legal
 	var proxyTyp tProxy.ProtoTyp
-	var err error
 	if proto == "sock5" {
 		// never err
 		proxyTyp = tProxy.SOCK5TCP

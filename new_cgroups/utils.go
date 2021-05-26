@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// attach pid to cgroups path
-func attach(pid string, path string) error {
+// Attach pid to cgroups path
+func Attach(pid string, path string) error {
 	if !com.IsPid(pid) {
 		return errors.New("pid is not num")
 	}

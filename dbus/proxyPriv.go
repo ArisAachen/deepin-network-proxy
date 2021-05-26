@@ -1,6 +1,7 @@
 package DBus
 
 import (
+	"errors"
 	com "github.com/ArisAachen/deepin-network-proxy/com"
 	config "github.com/ArisAachen/deepin-network-proxy/config"
 	define "github.com/ArisAachen/deepin-network-proxy/define"
@@ -8,9 +9,13 @@ import (
 	newCGroups "github.com/ArisAachen/deepin-network-proxy/new_cgroups"
 	newIptables "github.com/ArisAachen/deepin-network-proxy/new_iptables"
 	tProxy "github.com/ArisAachen/deepin-network-proxy/tproxy"
+	"github.com/godbus/dbus"
 	"net"
+	"os"
 	"path/filepath"
+	"pkg.deepin.io/lib/dbusutil"
 	"pkg.deepin.io/lib/log"
+	"strconv"
 )
 
 var logger *log.Logger
@@ -57,6 +62,9 @@ type proxyPrv struct {
 	// handler manager
 	handlerMgr *tProxy.HandlerMgr
 
+	// handler
+	uid    int
+
 	// stop chan
 	stop bool
 }
@@ -79,11 +87,11 @@ func initProxyPrv(scope define.Scope, priority define.Priority) proxyPrv {
 
 // proxy prepare
 func (mgr *proxyPrv) startRedirect() error {
-	// make sure manager start init
-	mgr.manager.Start()
-
 	// clean old redirect
 	_ = mgr.firstClean()
+
+	// make sure manager start init
+	mgr.manager.Start()
 
 	// create cgroups
 	err := mgr.createCGroupController()
@@ -195,3 +203,50 @@ func (mgr *proxyPrv) firstClean() error {
 	logger.Debugf("[%s] run first clean script success", mgr.scope)
 	return nil
 }
+
+// cgroups
+func (mgr *proxyPrv) GetCGroups() (string, *dbus.Error) {
+	if mgr.controller == nil {
+		return "", nil
+	}
+	path := mgr.controller.GetCGroupPath()
+	// path := "/sys/fs/cgroup/unified/App.slice/cgroups.procs"
+	_, err := os.Stat(path)
+	if err != nil {
+		logger.Warningf("app cgroups not exist, err: %v", err)
+		return "", dbusutil.ToError(err)
+	}
+	return path, nil
+}
+
+// add pid to proc
+func (mgr *proxyPrv) AddProc(pid int) *dbus.Error {
+	// controller
+	if mgr.controller == nil {
+		return dbusutil.ToError(errors.New("controller not exist"))
+	}
+	// attach pid
+	err := newCGroups.Attach(strconv.Itoa(pid), mgr.controller.GetControlPath())
+	if err != nil {
+		logger.Debugf("attach %d to %s failed, err: %v", pid, mgr.controller.GetControlPath(), err)
+		return dbusutil.ToError(err)
+	}
+	logger.Debugf("attach %d to %s success", pid, mgr.controller.GetControlPath())
+	return nil
+}
+
+//func (mgr *proxyPrv) CreateCGroups(sender dbus.Sender, cgroup string) *dbus.Error {
+//	con, err := dbusutil.NewSystemService()
+//	if err != nil {
+//		logger.Warningf("get session service failed, err: %v", err)
+//		return dbusutil.ToError(err)
+//	}
+//	uid, err := con.GetConnUID(string(sender))
+//	if err != nil {
+//		logger.Warningf("get name owner failed, err: %v", err)
+//		return dbusutil.ToError(err)
+//	}
+//	mgr.uid = int(uid)
+//	mgr.cgroup = cgroup
+//	return nil
+//}

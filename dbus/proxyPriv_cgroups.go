@@ -10,7 +10,7 @@ func (mgr *proxyPrv) getCGroupPriority() define.Priority {
 
 // create cgroup handler add to manager
 func (mgr *proxyPrv) createCGroupController() error {
-	controller, err := mgr.manager.controllerMgr.CreatePriorityController(mgr.scope, mgr.priority)
+	controller, err := mgr.manager.controllerMgr.CreatePriorityController(mgr.scope, mgr.uid, mgr.priority)
 	if err != nil {
 		return err
 	}

@@ -6,7 +6,6 @@ import (
 	config "github.com/ArisAachen/deepin-network-proxy/config"
 	define "github.com/ArisAachen/deepin-network-proxy/define"
 	"github.com/godbus/dbus"
-	"os"
 	"pkg.deepin.io/lib/dbusutil"
 )
 
@@ -15,13 +14,14 @@ type AppProxy struct {
 
 	// methods
 	methods *struct {
-		ClearProxy func()
-		SetProxies func() `in:"proxies" out:"err"`
-		StartProxy func() `in:"proto,name,udp" out:"err"`
-		StopProxy  func()
-		GetProxy   func() `out:"proxy"`
-		AddProxy   func() `in:"proto,name,proxy"`
-		GetCGroups func() `out:"cgroups"`
+		ClearProxy    func()
+		SetProxies    func() `in:"proxies" out:"err"`
+		StartProxy    func() `in:"proto,name,udp" out:"err"`
+		StopProxy     func()
+		GetProxy      func() `out:"proxy"`
+		AddProxy      func() `in:"proto,name,proxy"`
+		GetCGroups    func() `out:"cgroups"`
+		AddProc       func() `in:"pid" out:"success"`
 
 		// diff method
 		AddProxyApps func() `in:"app" out:"err"`
@@ -165,15 +165,4 @@ func (mgr *AppProxy) delProxyApps(apps []string) error {
 		return nil
 	}
 	return nil
-}
-
-// cgroups
-func (mgr *AppProxy) GetCGroups() (string, *dbus.Error) {
-	path := "/sys/fs/cgroup/unified/App.slice/cgroups.procs"
-	_, err := os.Stat(path)
-	if err != nil {
-		logger.Warningf("app cgroups not exist, err: %v", err)
-		return "", dbusutil.ToError(err)
-	}
-	return path, nil
 }

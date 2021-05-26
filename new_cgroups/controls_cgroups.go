@@ -24,28 +24,28 @@ func (ctSl *ControlProcSl) Len() int {
 	return len(*ctSl)
 }
 
-// attach pid back to origin cgroup
+// Attach pid back to origin cgroup
 func (ctSl *ControlProcSl) Release() error {
 	for _, ctrl := range *ctSl {
-		err := attach(ctrl.Pid, ctrl.CGroupPath)
+		err := Attach(ctrl.Pid, ctrl.CGroupPath)
 		if err != nil {
-			logger.Warningf("[%s] attach %s back to origin cgroups %s failed, err: %v", ctrl.ExecPath, ctrl.Pid, ctrl.CGroupPath, err)
+			logger.Warningf("[%s] Attach %s back to origin cgroups %s failed, err: %v", ctrl.ExecPath, ctrl.Pid, ctrl.CGroupPath, err)
 			continue
 		}
-		logger.Debugf("[%s] attach %s back to origin cgroups %s success", ctrl.ExecPath, ctrl.Pid, ctrl.CGroupPath)
+		logger.Debugf("[%s] Attach %s back to origin cgroups %s success", ctrl.ExecPath, ctrl.Pid, ctrl.CGroupPath)
 	}
 	return nil
 }
 
-// attach pid to new cgroups
+// Attach pid to new cgroups
 func (ctSl *ControlProcSl) Attach(path string) error {
 	for _, ctrl := range *ctSl {
-		err := attach(ctrl.Pid, path)
+		err := Attach(ctrl.Pid, path)
 		if err != nil {
-			logger.Warningf("[%s] attach %s back to new cgroups %s failed, err: %v", ctrl.ExecPath, ctrl.Pid, path, err)
+			logger.Warningf("[%s] Attach %s back to new cgroups %s failed, err: %v", ctrl.ExecPath, ctrl.Pid, path, err)
 			return err
 		}
-		logger.Debugf("[%s] attach %s to new cgroups %s success", ctrl.ExecPath, ctrl.Pid, path)
+		logger.Debugf("[%s] Attach %s to new cgroups %s success", ctrl.ExecPath, ctrl.Pid, path)
 	}
 	return nil
 }
@@ -163,8 +163,8 @@ func (c *Controller) AddCtrlProc(proc *netlink.ProcMessage) error {
 	if c.CheckCtlProcExist(proc) {
 		return nil
 	}
-	// attach pid to cgroup
-	err := attach(proc.Pid, c.GetControlPath())
+	// Attach pid to cgroup
+	err := Attach(proc.Pid, c.GetControlPath())
 	if err != nil {
 		return err
 	}
@@ -258,7 +258,7 @@ func (c *Controller) ReleaseToManager(path string) error {
 	}
 	// check if controller exist, now usually get lower priority path
 	controller := c.manager.GetControllerByCtlPath(path)
-	// path dont exist in any controller, attach back to origin cgroups
+	// path dont exist in any controller, Attach back to origin cgroups
 	if controller == nil {
 		logger.Debugf("[%s] release has no lower priority, release to origin cgroup", c.Name)
 		err := procSl.Release()
@@ -312,7 +312,7 @@ func (c *Controller) MoveIn(path string, inCtSl ControlProcSl) error {
 		}
 		// save
 		c.CtlProcMap[path] = inCtSl
-		logger.Debugf("[%s] attach all to new cgroups", c.Name)
+		logger.Debugf("[%s] Attach all to new cgroups", c.Name)
 		return nil
 	}
 	// change and add
@@ -329,7 +329,7 @@ func (c *Controller) MoveIn(path string, inCtSl ControlProcSl) error {
 			return err
 		}
 	}
-	logger.Debugf("[%s] attach all to new cgroups", c.Name)
+	logger.Debugf("[%s] Attach all to new cgroups", c.Name)
 	return nil
 }
 
