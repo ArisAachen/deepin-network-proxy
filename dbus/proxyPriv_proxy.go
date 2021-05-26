@@ -279,6 +279,7 @@ func (mgr *proxyPrv) readMsgUDP(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, li
 	mgr.handlerMgr.CloseTypHandler(proxyTyp)
 }
 
+// for t-proxy
 func (mgr *proxyPrv) proxyTcp(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, lConn net.Conn) {
 	// request is redirect by t-proxy, output -> pre-routing
 	// at that time, the actual remote addr is conn`s local addr, the actual local addr is conn`s remote addr
