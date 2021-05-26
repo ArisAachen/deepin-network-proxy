@@ -25,7 +25,7 @@ func NewManager() *Manager {
 }
 
 // create controller handler
-func (m *Manager) CreatePriorityController(name define.Scope, uid int, priority define.Priority) (*Controller, error) {
+func (m *Manager) CreatePriorityController(name define.Scope, uid int, gid int, priority define.Priority) (*Controller, error) {
 	if m.CheckControllerExist(name, priority) {
 		return nil, errors.New("controller name or priority already exist")
 	}
@@ -42,7 +42,7 @@ func (m *Manager) CreatePriorityController(name define.Scope, uid int, priority 
 	if err != nil {
 		return nil, err
 	}
-	err = os.Chown(controller.GetCGroupPath(), uid, 0)
+	err = os.Chown(controller.GetCGroupPath(), uid, gid)
 	if err != nil {
 		return nil, err
 	}

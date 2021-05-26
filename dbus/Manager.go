@@ -243,7 +243,7 @@ func (m *Manager) initCGroups() error {
 	m.controllerMgr = newCGroups.NewManager()
 	// create controller
 	var err error
-	m.mainController, err = m.controllerMgr.CreatePriorityController(define.Main, 0, define.MainPriority)
+	m.mainController, err = m.controllerMgr.CreatePriorityController(define.Main, 0, 0, define.MainPriority)
 	if err != nil {
 		logger.Warningf("init cgroup failed, err: %v", err)
 		return err

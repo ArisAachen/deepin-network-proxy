@@ -6,6 +6,7 @@ import (
 	tProxy "github.com/ArisAachen/deepin-network-proxy/tproxy"
 	"github.com/godbus/dbus"
 	"net"
+	"os/user"
 	"pkg.deepin.io/lib/dbusutil"
 	"strconv"
 	"syscall"
@@ -36,19 +37,32 @@ func (mgr *proxyPrv) StartProxy(sender dbus.Sender, proto string, name string, u
 		logger.Warningf("get session service failed, err: %v", err)
 		return dbusutil.ToError(err)
 	}
-	uid, err := con.GetConnUID(string(sender))
+	mgr.uid, err = con.GetConnUID(string(sender))
 	if err != nil {
 		logger.Warningf("get name owner failed, err: %v", err)
 		return dbusutil.ToError(err)
 	}
-	mgr.uid = int(uid)
-
-	// already in proxy
-	if !mgr.stop {
-		logger.Debugf("[%] already in proxy", mgr.scope)
-		return nil
+	mgr.uid, err = con.GetConnUID(string(sender))
+	if err != nil {
+		logger.Warningf("get name owner failed, err: %v", err)
+		return dbusutil.ToError(err)
 	}
-	mgr.stop = false
+	id, err := user.LookupId(strconv.Itoa(int(mgr.uid)))
+	if err != nil {
+		return dbusutil.ToError(err)
+	}
+	gid, err := strconv.Atoi(id.Gid)
+	if err != nil {
+		return dbusutil.ToError(err)
+	}
+	mgr.gid = uint32(gid)
+
+	//// already in proxy
+	//if !mgr.stop {
+	//	logger.Debugf("[%] already in proxy", mgr.scope)
+	//	return nil
+	//}
+	//mgr.stop = false
 	logger.Debugf("[%s] start proxy, proto [%s] name [%s] udp [%v]", mgr.scope, proto, name, udp)
 	// check if proto is legal
 	var proxyTyp tProxy.ProtoTyp
@@ -107,11 +121,14 @@ func (mgr *proxyPrv) StartProxy(sender dbus.Sender, proto string, name string, u
 
 // stop proxy
 func (mgr *proxyPrv) StopProxy() *dbus.Error {
-	if mgr.stop {
-		logger.Debugf("[%s] already stop proxy")
+	if !mgr.Enabled {
 		return nil
 	}
-	mgr.stop = true
+	//if mgr.stop {
+	//	logger.Debugf("[%s] already stop proxy")
+	//	return nil
+	//}
+	//mgr.stop = true
 	logger.Debugf("[%s] stop proxy, enable: %v, proxy: %v", mgr.scope, mgr.Enabled, mgr.Proxy)
 	// stop to break accept and read message
 	if mgr.tcpHandler != nil {
@@ -245,7 +262,7 @@ func (mgr *proxyPrv) accept(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, listen
 		// https://github.com/golang/go/issues/10527
 		lConn, err := listen.Accept()
 		if err != nil {
-			if mgr.stop {
+			if !mgr.Enabled {
 				logger.Debugf("[%s] stop proxy tcp break", mgr.scope)
 				break
 			}
@@ -281,7 +298,7 @@ func (mgr *proxyPrv) readMsgUDP(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, li
 		oob := make([]byte, 1024)
 		_, oobNum, _, lAddr, err := conn.ReadMsgUDP(buf, oob)
 		if err != nil {
-			if mgr.stop {
+			if !mgr.Enabled {
 				logger.Debugf("[%s] stop proxy udp break", mgr.scope)
 				break
 			}

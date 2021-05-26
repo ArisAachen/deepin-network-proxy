@@ -63,10 +63,11 @@ type proxyPrv struct {
 	handlerMgr *tProxy.HandlerMgr
 
 	// handler
-	uid    int
+	uid uint32
+	gid uint32
 
 	// stop chan
-	stop bool
+	// stop bool
 }
 
 // init proxy private
@@ -75,7 +76,7 @@ func initProxyPrv(scope define.Scope, priority define.Priority) proxyPrv {
 		scope:      scope,
 		priority:   priority,
 		handlerMgr: tProxy.NewHandlerMgr(scope),
-		stop:       true,
+		// stop:       true,
 		Proxies: config.ScopeProxies{
 			Proxies:      make(map[string][]config.Proxy),
 			ProxyProgram: []string{},
@@ -96,14 +97,13 @@ func (mgr *proxyPrv) startRedirect() error {
 	// create cgroups
 	err := mgr.createCGroupController()
 	if err != nil {
-		logger.Warning("[%s] create cgroup failed, err: %v", err)
-		return err
+		logger.Warning("[%s] create cgroup failed, err: %v", mgr.scope, err)
 	}
 
 	// create iptables
 	err = mgr.createTable()
 	if err != nil {
-		logger.Warning("[%s] create iptables failed, err: %v", err)
+		logger.Warning("[%s] create iptables failed, err: %v", mgr.scope, err)
 		return err
 	}
 	err = mgr.appendRule()
@@ -220,13 +220,13 @@ func (mgr *proxyPrv) GetCGroups() (string, *dbus.Error) {
 }
 
 // add pid to proc
-func (mgr *proxyPrv) AddProc(pid int) *dbus.Error {
+func (mgr *proxyPrv) AddProc(pid int32) *dbus.Error {
 	// controller
 	if mgr.controller == nil {
 		return dbusutil.ToError(errors.New("controller not exist"))
 	}
 	// attach pid
-	err := newCGroups.Attach(strconv.Itoa(pid), mgr.controller.GetControlPath())
+	err := newCGroups.Attach(strconv.Itoa(int(pid)), mgr.controller.GetControlPath())
 	if err != nil {
 		logger.Debugf("attach %d to %s failed, err: %v", pid, mgr.controller.GetControlPath(), err)
 		return dbusutil.ToError(err)
