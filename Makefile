@@ -27,7 +27,7 @@ Out/%:  prepare
 	GOPATH="${CURDIR}/${GOPATH_DIR}:$(GOPATH)" ${GOBUILD} -o bin/${@F} ${GOPKG_PREFIX}/out/${@F}
 
 install:
-	mkdir -p ${PREFIXETC}/${DEEPIN}/${PROXYFILE}
+	mkdir -p ${DESTDIR}${PREFIXETC}/${DEEPIN}/${PROXYFILE}
 	install -v -D -m755 -t ${DESTDIR}${PREFIXETC}/${DEEPIN}/${PROXYFILE} misc/script/clean_script.sh
 	install -v -D -m755 -t ${DESTDIR}${PREFIXETC}/${DEEPIN}/${PROXYFILE} misc/proxy/proxy.yaml
 	install -v -D -m755 -t ${DESTDIR}${PREFIX}/share/dbus-1/system.d misc/proxy/com.deepin.system.proxy.conf
