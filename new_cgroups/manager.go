@@ -2,7 +2,6 @@ package NewCGroups
 
 import (
 	"errors"
-	"os"
 	"sort"
 
 	com "github.com/ArisAachen/deepin-network-proxy/com"
@@ -42,10 +41,10 @@ func (m *Manager) CreatePriorityController(name define.Scope, uid int, gid int, 
 	if err != nil {
 		return nil, err
 	}
-	err = os.Chown(controller.GetCGroupPath(), uid, gid)
-	if err != nil {
-		return nil, err
-	}
+	//err = os.Chown(controller.GetCGroupPath(), uid, gid)
+	//if err != nil {
+	//	return nil, err
+	//}
 	// append controller
 	m.controllers = append(m.controllers, controller)
 	sort.SliceStable(m.controllers, func(i, j int) bool {

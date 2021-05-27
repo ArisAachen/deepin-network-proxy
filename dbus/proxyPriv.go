@@ -138,6 +138,8 @@ func (mgr *proxyPrv) stopRedirect() error {
 		return err
 	}
 
+	_ = mgr.attachBackUser()
+
 	// release cgroups
 	err = mgr.releaseController()
 	if err != nil {

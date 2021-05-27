@@ -1,14 +1,20 @@
 package DBus
 
 import (
+	"bufio"
+	"bytes"
 	com "github.com/ArisAachen/deepin-network-proxy/com"
 	config "github.com/ArisAachen/deepin-network-proxy/config"
+	newCGroups "github.com/ArisAachen/deepin-network-proxy/new_cgroups"
 	tProxy "github.com/ArisAachen/deepin-network-proxy/tproxy"
 	"github.com/godbus/dbus"
+	"io/ioutil"
 	"net"
+	"os"
 	"os/user"
 	"pkg.deepin.io/lib/dbusutil"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -56,6 +62,9 @@ func (mgr *proxyPrv) StartProxy(sender dbus.Sender, proto string, name string, u
 		return dbusutil.ToError(err)
 	}
 	mgr.gid = uint32(gid)
+	if mgr.Enabled {
+		_ = mgr.StopProxy()
+	}
 
 	//// already in proxy
 	//if !mgr.stop {
@@ -66,7 +75,7 @@ func (mgr *proxyPrv) StartProxy(sender dbus.Sender, proto string, name string, u
 	logger.Debugf("[%s] start proxy, proto [%s] name [%s] udp [%v]", mgr.scope, proto, name, udp)
 	// check if proto is legal
 	var proxyTyp tProxy.ProtoTyp
-	if proto == "sock5" {
+	if proto == "socks5" {
 		// never err
 		proxyTyp = tProxy.SOCK5TCP
 	} else {
@@ -153,6 +162,43 @@ func (mgr *proxyPrv) StopProxy() *dbus.Error {
 	}
 
 	return nil
+}
+
+// attach to cgroup v2 user
+func (mgr *proxyPrv) attachBackUser() error {
+	pathSl := []string{"/sys", "fs", "cgroup", "unified", "user.slice", "user-" + strconv.Itoa(int(mgr.uid)) + ".slice", "cgroup.procs"}
+	path := strings.Join(pathSl, "/")
+	logger.Debugf("attach back cgroup user is %s", path)
+	ctl := mgr.controller.GetControlPath()
+	if _, err := os.Stat(ctl); err != nil {
+		logger.Warningf("attach back file not exist, err: %v", err)
+		return err
+	}
+	// read cgroups file
+	buf, err := ioutil.ReadFile(ctl)
+	if err != nil {
+		logger.Warningf("read file failed, err: %v", err)
+		return err
+	}
+	// construct buffer
+	by := bytes.NewBuffer(buf)
+	// make reader
+	rd := bufio.NewReader(by)
+	for {
+		buf, _, err = rd.ReadLine()
+		if err != nil {
+			logger.Debugf("read file end, reason: %v", err)
+			return err
+		}
+		// attach back
+		err = newCGroups.Attach(string(buf), path)
+		if err != nil {
+			logger.Debugf("attach pid %s back %s failed, err: %v", string(buf), path, err)
+			continue
+		}
+		logger.Debugf("attach pid %s back %s success", string(buf), path)
+	}
+
 }
 
 // set proxy
@@ -267,7 +313,7 @@ func (mgr *proxyPrv) accept(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, listen
 				break
 			}
 			logger.Warningf("[%s] accept socket failed, err: %v", proxyTyp, err)
-			continue
+			break
 		}
 		// proxy tcp
 		go mgr.proxyTcp(proxyTyp, proxy, lConn)
