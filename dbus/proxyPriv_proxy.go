@@ -48,11 +48,6 @@ func (mgr *proxyPrv) StartProxy(sender dbus.Sender, proto string, name string, u
 		logger.Warningf("get name owner failed, err: %v", err)
 		return dbusutil.ToError(err)
 	}
-	mgr.uid, err = con.GetConnUID(string(sender))
-	if err != nil {
-		logger.Warningf("get name owner failed, err: %v", err)
-		return dbusutil.ToError(err)
-	}
 	id, err := user.LookupId(strconv.Itoa(int(mgr.uid)))
 	if err != nil {
 		return dbusutil.ToError(err)
