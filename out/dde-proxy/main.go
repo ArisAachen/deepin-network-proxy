@@ -9,7 +9,6 @@ func main() {
 
 	logger := log.NewLogger("daemon/proxy")
 	logger.SetLogLevel(log.LevelInfo)
-	//
 	manager := proxyDBus.NewManager()
 	err := manager.Init()
 	if err != nil {
