@@ -1,0 +1,41 @@
+diff --git a/Makefile b/Makefile
+index 849d32e..90fffb3 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,6 @@
+ PREFIX=/usr
+ PREFIXETC=/etc
+ 
+-LIB=lib
+ DEEPIN=deepin
+ PROXYFILE=deepin-proxy
+ DAEMON=deepin-daemon
+@@ -32,7 +31,7 @@ install:
+ 	install -v -D -m755 -t ${DESTDIR}${PREFIXETC}/${DEEPIN}/${PROXYFILE} misc/proxy/proxy.yaml
+ 	install -v -D -m755 -t ${DESTDIR}${PREFIX}/share/dbus-1/system.d misc/proxy/com.deepin.system.proxy.conf
+ 	install -v -D -m755 -t ${DESTDIR}${PREFIX}/share/dbus-1/system-services misc/proxy/com.deepin.system.proxy.service
+-	install -v -D -m755 -t ${DESTDIR}${PREFIX}/${LIB}/${DAEMON} bin/dde-proxy
++	install -v -D -m755 -t ${DESTDIR}${PREFIX}/libexec/${DAEMON} bin/dde-proxy
+ 
+ 
+ clean:
+diff --git a/misc/procs/com.deepin.system.Procs.service b/misc/procs/com.deepin.system.Procs.service
+index cd76676..19ed078 100644
+--- a/misc/procs/com.deepin.system.Procs.service
++++ b/misc/procs/com.deepin.system.Procs.service
+@@ -1,4 +1,4 @@
+ [D-BUS Service]
+ Name=com.deepin.system.Procs
+-Exec=/usr/lib/deepin-daemon/netlink
++Exec=/usr/libexec/deepin-daemon/netlink
+ User=root
+diff --git a/misc/proxy/com.deepin.system.proxy.service b/misc/proxy/com.deepin.system.proxy.service
+index 008511e..aaf1657 100644
+--- a/misc/proxy/com.deepin.system.proxy.service
++++ b/misc/proxy/com.deepin.system.proxy.service
+@@ -1,4 +1,4 @@
+ [D-BUS Service]
+ Name=com.deepin.system.proxy
+-Exec=/usr/lib/deepin-daemon/dde-proxy
++Exec=/usr/libexec/deepin-daemon/dde-proxy
+ User=root
