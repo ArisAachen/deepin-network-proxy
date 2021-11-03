@@ -12,6 +12,7 @@ GOPATH_DIR=gopath
 GOPKG_PREFIX=github.com/ArisAachen/deepin-network-proxy
 
 GOBUILD = go build $(GO_BUILD_FLAGS)
+export GO111MODULE=off
 
 all: build
 
