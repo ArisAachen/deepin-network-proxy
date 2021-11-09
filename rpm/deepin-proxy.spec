@@ -1,6 +1,6 @@
 %global debug_package   %{nil}
 
-Name:           deepin-network-proxy
+Name:           deepin-proxy
 Version:        1.0.0.7
 Release:        1
 Summary:        Most simple RPM package
