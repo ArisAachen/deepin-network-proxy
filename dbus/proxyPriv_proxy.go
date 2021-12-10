@@ -3,19 +3,20 @@ package DBus
 import (
 	"bufio"
 	"bytes"
+	"io/ioutil"
+	"net"
+	"os"
+	"os/user"
+	"strconv"
+	"strings"
+	"syscall"
+
 	com "github.com/ArisAachen/deepin-network-proxy/com"
 	config "github.com/ArisAachen/deepin-network-proxy/config"
 	newCGroups "github.com/ArisAachen/deepin-network-proxy/new_cgroups"
 	tProxy "github.com/ArisAachen/deepin-network-proxy/tproxy"
 	"github.com/godbus/dbus"
-	"io/ioutil"
-	"net"
-	"os"
-	"os/user"
-	"pkg.deepin.io/lib/dbusutil"
-	"strconv"
-	"strings"
-	"syscall"
+	"github.com/linuxdeepin/go-lib/dbusutil"
 )
 
 // interface path

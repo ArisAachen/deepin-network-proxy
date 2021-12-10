@@ -2,7 +2,7 @@ package main
 
 import (
 	proxyDBus "github.com/ArisAachen/deepin-network-proxy/dbus"
-	"pkg.deepin.io/lib/log"
+	"github.com/linuxdeepin/go-lib/log"
 )
 
 func main() {

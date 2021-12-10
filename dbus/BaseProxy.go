@@ -4,8 +4,8 @@ import (
 	config "github.com/ArisAachen/deepin-network-proxy/config"
 	define "github.com/ArisAachen/deepin-network-proxy/define"
 	"github.com/godbus/dbus"
-	"pkg.deepin.io/lib/dbusutil"
-	"pkg.deepin.io/lib/log"
+	"github.com/linuxdeepin/go-lib/dbusutil"
+	"github.com/linuxdeepin/go-lib/log"
 )
 
 // https://www.kernel.org/doc/Documentation/networking/tproxy.txt

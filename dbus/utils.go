@@ -2,12 +2,13 @@ package DBus
 
 import (
 	"encoding/json"
-	config "github.com/ArisAachen/deepin-network-proxy/config"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"pkg.deepin.io/lib/appinfo/desktopappinfo"
 	"strings"
+
+	config "github.com/ArisAachen/deepin-network-proxy/config"
+	"github.com/linuxdeepin/go-lib/appinfo/desktopappinfo"
 )
 
 // unmarshal buf to proxy
@@ -55,5 +56,5 @@ func parseDesktopPath(app string) (string, error) {
 			return "", err
 		}
 	}
-	return table,nil
+	return table, nil
 }

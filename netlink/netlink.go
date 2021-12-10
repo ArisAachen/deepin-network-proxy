@@ -9,8 +9,8 @@ import (
 	"sync"
 	"syscall"
 
-	"pkg.deepin.io/lib/dbusutil"
-	"pkg.deepin.io/lib/log"
+	"github.com/linuxdeepin/go-lib/dbusutil"
+	"github.com/linuxdeepin/go-lib/log"
 )
 
 // #include <linux/connector.h>
@@ -299,7 +299,7 @@ func (p *ProcManager) addProc(pid string, msg ProcMessage) {
 	p.lock.Unlock()
 
 	logger.Debugf("current exec proc %v", msg)
-	err := p.service.Emit(p, "ExecProc", msg.ExecPath, msg.Cgroup2Path, msg.Pid,msg.PPid)
+	err := p.service.Emit(p, "ExecProc", msg.ExecPath, msg.Cgroup2Path, msg.Pid, msg.PPid)
 	if err != nil {
 		logger.Warningf("emit %v ExecProc failed, err: %v", msg, err)
 		return
@@ -323,7 +323,7 @@ func (p *ProcManager) delProc(pid string) {
 
 	if ok {
 		logger.Debugf("current exit proc %v", msg)
-		err := p.service.Emit(p, "ExitProc", msg.ExecPath, msg.Cgroup2Path, msg.Pid,msg.PPid)
+		err := p.service.Emit(p, "ExitProc", msg.ExecPath, msg.Cgroup2Path, msg.Pid, msg.PPid)
 		if err != nil {
 			logger.Warningf("emit %v ExitProc failed, err: %v", msg, err)
 			return

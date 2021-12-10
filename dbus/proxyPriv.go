@@ -2,20 +2,21 @@ package DBus
 
 import (
 	"errors"
+	"net"
+	"os"
+	"path/filepath"
+	"strconv"
+
 	com "github.com/ArisAachen/deepin-network-proxy/com"
 	config "github.com/ArisAachen/deepin-network-proxy/config"
 	define "github.com/ArisAachen/deepin-network-proxy/define"
-	"github.com/ArisAachen/deepin-network-proxy/ip_route"
+	IpRoute "github.com/ArisAachen/deepin-network-proxy/ip_route"
 	newCGroups "github.com/ArisAachen/deepin-network-proxy/new_cgroups"
 	newIptables "github.com/ArisAachen/deepin-network-proxy/new_iptables"
 	tProxy "github.com/ArisAachen/deepin-network-proxy/tproxy"
 	"github.com/godbus/dbus"
-	"net"
-	"os"
-	"path/filepath"
-	"pkg.deepin.io/lib/dbusutil"
-	"pkg.deepin.io/lib/log"
-	"strconv"
+	"github.com/linuxdeepin/go-lib/dbusutil"
+	"github.com/linuxdeepin/go-lib/log"
 )
 
 var logger *log.Logger

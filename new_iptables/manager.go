@@ -1,6 +1,6 @@
 package NewIptables
 
-import "pkg.deepin.io/lib/log"
+import "github.com/linuxdeepin/go-lib/log"
 
 /*
 	Iptables module extends

@@ -2,11 +2,12 @@ package DBus
 
 import (
 	"fmt"
+
 	com "github.com/ArisAachen/deepin-network-proxy/com"
 	config "github.com/ArisAachen/deepin-network-proxy/config"
 	define "github.com/ArisAachen/deepin-network-proxy/define"
 	"github.com/godbus/dbus"
-	"pkg.deepin.io/lib/dbusutil"
+	"github.com/linuxdeepin/go-lib/dbusutil"
 )
 
 type AppProxy struct {

@@ -6,7 +6,7 @@ Build-Depends:
  debhelper-compat (= 11),
  dh-golang,
  golang-any,
- golang-dlib-dev,
+ golang-github-linuxdeepin-go-lib-dev,
  golang-gopkg-check.v1-dev,
  golang-gopkg-yaml.v2-dev,
  golang-github-linuxdeepin-go-dbus-factory-dev,

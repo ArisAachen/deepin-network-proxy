@@ -6,7 +6,7 @@ import (
 
 	com "github.com/ArisAachen/deepin-network-proxy/com"
 	define "github.com/ArisAachen/deepin-network-proxy/define"
-	"pkg.deepin.io/lib/log"
+	"github.com/linuxdeepin/go-lib/log"
 )
 
 var logger *log.Logger

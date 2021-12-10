@@ -1,6 +1,6 @@
 package IpRoute
 
-import "pkg.deepin.io/lib/log"
+import "github.com/linuxdeepin/go-lib/log"
 
 var logger *log.Logger
 

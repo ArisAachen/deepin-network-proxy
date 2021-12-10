@@ -1,18 +1,19 @@
 package DBus
 
 import (
-	com "github.com/ArisAachen/deepin-network-proxy/com"
 	"os"
 	"path/filepath"
-	"pkg.deepin.io/lib/log"
 	"sync"
+
+	com "github.com/ArisAachen/deepin-network-proxy/com"
+	"github.com/linuxdeepin/go-lib/log"
 
 	config "github.com/ArisAachen/deepin-network-proxy/config"
 	define "github.com/ArisAachen/deepin-network-proxy/define"
 	route "github.com/ArisAachen/deepin-network-proxy/ip_route"
 	newCGroups "github.com/ArisAachen/deepin-network-proxy/new_cgroups"
 	newIptables "github.com/ArisAachen/deepin-network-proxy/new_iptables"
-	"pkg.deepin.io/lib/dbusutil"
+	"github.com/linuxdeepin/go-lib/dbusutil"
 )
 
 // manage all proxy handler
@@ -48,9 +49,7 @@ type Manager struct {
 
 // make manager
 func NewManager() *Manager {
-	manager := &Manager{
-
-	}
+	manager := &Manager{}
 	return manager
 }
 
