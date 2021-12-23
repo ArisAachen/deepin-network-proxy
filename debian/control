@@ -11,6 +11,8 @@ Build-Depends:
  golang-gopkg-yaml.v2-dev,
  golang-github-linuxdeepin-go-dbus-factory-dev,
  golang-github-stretchr-testify-dev,
+ golang-github-miekg-dns-dev,
+ golang-github-golang-groupcache-dev,
  golang-go | gccgo-5,
 Standards-Version: 4.3.0
 Homepage: http://www.deepin.org

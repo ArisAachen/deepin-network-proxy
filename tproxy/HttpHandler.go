@@ -3,7 +3,6 @@ package TProxy
 import (
 	"bufio"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -37,11 +36,11 @@ func (handler *HttpHandler) Tunnel() error {
 		return err
 	}
 	// check type
-	tcpAddr, ok := handler.rAddr.(*net.TCPAddr)
-	if !ok {
-		logger.Warning("[http] tunnel addr type is not tcp")
-		return errors.New("type is not tcp")
-	}
+	//tcpAddr, ok := handler.rAddr.(*net.TCPAddr)
+	//if !ok {
+	//	logger.Warning("[http] tunnel addr type is not tcp")
+	//	return errors.New("type is not tcp")
+	//}
 	// auth
 	auth := auth{
 		user:     handler.proxy.UserName,
@@ -50,12 +49,11 @@ func (handler *HttpHandler) Tunnel() error {
 	// create http head
 	req := &http.Request{
 		Method: http.MethodConnect,
-		Host:   tcpAddr.String(),
+		Host:   handler.rAddr.String(),
 		URL: &url.URL{
-			Host: tcpAddr.String(),
+			Host: handler.rAddr.String(),
 		},
-		Header: http.Header{
-		},
+		Header: http.Header{},
 	}
 	// check if need auth
 	if auth.user != "" && auth.password != "" {

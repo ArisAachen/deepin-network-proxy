@@ -3,9 +3,10 @@ package DBus
 import (
 	"errors"
 	"fmt"
+	"strconv"
+
 	define "github.com/ArisAachen/deepin-network-proxy/define"
 	newIptables "github.com/ArisAachen/deepin-network-proxy/new_iptables"
-	"strconv"
 )
 
 // create tables
@@ -63,8 +64,52 @@ func (mgr *proxyPrv) createTable() error {
 	if err != nil {
 		return err
 	}
+
 	// save chain
 	mgr.chains[1] = childChain
+
+	if mgr.Proxies.DNSPort != 0 {
+		chain := mgr.manager.iptablesMgr.GetChain("nat", "OUTPUT")
+		if chain == nil {
+			logger.Warningf("[%s] has no nat OUTPUT chain", mgr.scope)
+			return errors.New("has no nat OUTPUT chain")
+		}
+
+		cpl := &newIptables.CompleteRule{
+			Action: newIptables.REDIRECT,
+			BaseSl: []newIptables.BaseRule{
+				{
+					Match: "p",
+					Param: "udp",
+				},
+				{
+					Match: "-to-ports",
+					Param: "1053",
+				},
+			},
+			ExtendsSl: []newIptables.ExtendsRule{
+				{
+					Match: "m",
+					Elem: newIptables.ExtendsElem{
+						Match: "cgroup",
+						Base:  newIptables.BaseRule{Not: mark, Match: "path", Param: mgr.controller.GetName()},
+					},
+				},
+				{
+					Match: "m",
+					Elem: newIptables.ExtendsElem{
+						Match: "udp",
+						Base:  newIptables.BaseRule{Not: mark, Match: "dport", Param: "53"},
+					},
+				},
+			},
+		}
+
+		err := childChain.AppendRule(cpl)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

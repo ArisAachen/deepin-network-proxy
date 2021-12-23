@@ -121,6 +121,13 @@ func (mgr *proxyPrv) StartProxy(sender dbus.Sender, proto string, name string, u
 		return dbusutil.ToError(err)
 	}
 
+	go func() {
+		err := mgr.dnsProxy.startDNSProxy()
+		if err != nil {
+			logger.Warningf("start dns proxy failed: %v", err)
+		}
+	}()
+
 	return nil
 }
 
@@ -365,6 +372,28 @@ func (mgr *proxyPrv) readMsgUDP(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, li
 	mgr.handlerMgr.CloseTypHandler(proxyTyp)
 }
 
+type DomainAddr struct {
+	network string
+	Domain  string
+	Port    int
+}
+
+func newDomainAddr(network string, domain string, port int) *DomainAddr {
+	return &DomainAddr{
+		network: network,
+		Domain:  domain,
+		Port:    port,
+	}
+}
+
+func (a *DomainAddr) Network() string {
+	return a.network
+}
+
+func (a *DomainAddr) String() string {
+	return a.Domain + ":" + strconv.Itoa(a.Port)
+}
+
 // for t-proxy
 func (mgr *proxyPrv) proxyTcp(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, lConn net.Conn) {
 	// request is redirect by t-proxy, output -> pre-routing
@@ -373,9 +402,27 @@ func (mgr *proxyPrv) proxyTcp(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, lCon
 	lAddr := lConn.RemoteAddr()
 	rAddr := lConn.LocalAddr()
 
+	realRAddr := rAddr
+	if proxyTyp == tProxy.HTTP {
+		switch addr := rAddr.(type) {
+		case *net.UDPAddr:
+			domain, ok := mgr.dnsProxy.getDomainFromFakeIP(addr.IP)
+			if ok {
+				realRAddr = newDomainAddr("udp", domain, addr.Port)
+			}
+
+		case *net.TCPAddr:
+			domain, ok := mgr.dnsProxy.getDomainFromFakeIP(addr.IP)
+			if ok {
+				realRAddr = newDomainAddr("tcp", domain, addr.Port)
+			}
+
+		}
+	}
+
 	// print local -> remote
 	logger.Infof("[%s] tcp request capture by proxy successfully, "+
-		"local[%s] -> remote [%s]", proxyTyp, lAddr.String(), rAddr.String())
+		"local[%s] -> remote [%s](%s)", proxyTyp, lAddr.String(), rAddr.String(), realRAddr)
 
 	// make key to mark this connection
 	key := tProxy.HandlerKey{
@@ -383,7 +430,7 @@ func (mgr *proxyPrv) proxyTcp(proxyTyp tProxy.ProtoTyp, proxy config.Proxy, lCon
 		DstAddr: rAddr.String(),
 	}
 	// create new handler
-	handler := tProxy.NewHandler(proxyTyp, mgr.scope, key, proxy, lAddr, rAddr, lConn)
+	handler := tProxy.NewHandler(proxyTyp, mgr.scope, key, proxy, lAddr, realRAddr, lConn)
 	// create tunnel between proxy server and dst server
 	err := handler.Tunnel()
 	if err != nil {

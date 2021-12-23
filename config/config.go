@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"github.com/ArisAachen/deepin-network-proxy/com"
+	Com "github.com/ArisAachen/deepin-network-proxy/com"
 	define "github.com/ArisAachen/deepin-network-proxy/define"
 	"gopkg.in/yaml.v2"
 )
@@ -113,6 +113,9 @@ type ScopeProxies struct {
 	// white list
 	WhiteList []string `yaml:"whitelist"` // white site dont use proxy, not use this time
 	TPort     int      `yaml:"t-port"`
+	DNSPort   int      `yaml:"dns-port"`
+
+	UseFakeIP bool `yaml:"use-fake-ip"`
 }
 
 func (p *ScopeProxies) GetProxy(proto string, name string) (Proxy, error) {
